@@ -1,0 +1,61 @@
+{
+    "_readme": [
+        "This file locks the dependencies of your project to a known state",
+        "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
+        "This file is @generated automatically"
+    ],
+    "content-hash": "6c7dbeedf51e50d9b1e904a2169fbf97",
+    "packages": [
+        {
+            "name": "rsousa/collectibles",
+            "version": "v1.0.0",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/sousarmb/collectibles.git",
+                "reference": "21a310f8d28a506129aa42f4aed43d72a9673b08"
+            },
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/sousarmb/collectibles/zipball/21a310f8d28a506129aa42f4aed43d72a9673b08",
+                "reference": "21a310f8d28a506129aa42f4aed43d72a9673b08",
+                "shasum": ""
+            },
+            "require": {
+                "php": ">=8.2"
+            },
+            "type": "project",
+            "autoload": {
+                "psr-4": {
+                    "Collectibles\\": "src/"
+                }
+            },
+            "notification-url": "https://packagist.org/downloads/",
+            "license": [
+                "MIT"
+            ],
+            "authors": [
+                {
+                    "name": "Ricardo Sousa",
+                    "email": "rmbsousa@gmail.com"
+                }
+            ],
+            "description": "Class to manage object collections",
+            "support": {
+                "issues": "https://github.com/sousarmb/collectibles/issues",
+                "source": "https://github.com/sousarmb/collectibles/tree/v1.0.0"
+            },
+            "time": "2024-05-21T23:39:37+00:00"
+        }
+    ],
+    "packages-dev": [],
+    "aliases": [],
+    "minimum-stability": "stable",
+    "stability-flags": [],
+    "prefer-stable": false,
+    "prefer-lowest": false,
+    "platform": {
+        "php": ">=8.2"
+    },
+    "platform-dev": [],
+    "plugin-api-version": "2.6.0"
+}

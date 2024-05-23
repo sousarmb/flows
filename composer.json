@@ -1,0 +1,22 @@
+{
+    "name": "rsousa/flows",
+    "description": "Business process model in PHP",
+    "type": "project",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "App\\": "App/",
+            "Flow\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "Ricardo Sousa",
+            "email": "rmbsousa@gmail.com"
+        }
+    ],
+    "require": {
+        "php": ">=8.2",
+        "rsousa/collectibles": "^1.0"
+    }
+}
