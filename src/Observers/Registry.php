@@ -54,12 +54,12 @@ class Registry {
     ): self {
         if (!$this->isValid($subject, true)) {
             throw new LogicException(
-                            sprintf(
-                                    $this->errors[0],
-                                    $subject,
-                                    IO::class,
-                                    Gate::class
-                            )
+                sprintf(
+                    $this->errors[0],
+                    $subject,
+                    IO::class,
+                    Gate::class
+                )
             );
         }
         if (!array_key_exists($subject, $this->observers)) {
