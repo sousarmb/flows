@@ -3,7 +3,7 @@
 /*
  * The MIT License
  *
- * Copyright 2024 rsousa.
+ * Copyright 2024 rsousa <rmbsousa@gmail.com>.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -36,15 +36,30 @@ class Registry {
     private array $taskSets = [];
     private Set $current;
 
+    /**
+     * 
+     * @param Set $taskSet
+     * @return self
+     */
     public function add(Set $taskSet): self {
         $this->taskSets[get_class($taskSet)] = $taskSet;
         return $this;
     }
-
+    
+    /**
+     * 
+     * @return Set
+     */
     public function getCurrentTaskSet(): Set {
         return $this->current;
     }
 
+    /**
+     * 
+     * @param string $classNameTaskSet
+     * @return Set
+     * @throws RuntimeException
+     */
     public function getNamed(string $classNameTaskSet): Set {
         if ($this->exists($classNameTaskSet)) {
             return $this->current = $this->taskSets[$classNameTaskSet];
@@ -53,6 +68,11 @@ class Registry {
         throw new RuntimeException('Unregistered task set ' . $classNameTaskSet);
     }
 
+    /**
+     * 
+     * @param string $classNameTaskSet
+     * @return bool
+     */
     public function exists(string $classNameTaskSet): bool {
         return array_key_exists(
                 $classNameTaskSet,

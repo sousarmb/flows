@@ -3,7 +3,7 @@
 /*
  * The MIT License
  *
- * Copyright 2024 rsousa.
+ * Copyright 2024 rsousa <rmbsousa@gmail.com>.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
@@ -31,15 +31,17 @@ namespace Flow;
 use LogicException;
 use Collectibles\Collection;
 use Collectibles\Contracts\IO;
-use Flow\Task\Registry;
+use Flow\Task\Registry as TaskRegistry;
 use Flow\Task\Set;
 use Flow\Gates\XorGate;
 use Flow\Gates\OrGate;
 use Flow\Contracts\Gate;
+use Flow\Observers\Registry as ObserverRegistry;
 
 class Kernel {
 
-    private Registry $taskSets;
+    private TaskRegistry $taskSets;
+    private ObserverRegistry $observers;
     private array $completeTaskSets = [];
     private array $errors = [
         'Inclusive (OR) gates must return at least 1 or more set of tasks to follow'
@@ -49,8 +51,12 @@ class Kernel {
      * 
      * @param Registry $taskSets
      */
-    public function __construct(Registry $taskSets) {
+    public function __construct(
+            TaskRegistry $taskSets,
+            ?ObserverRegistry $observers
+    ) {
         $this->taskSets = $taskSets;
+        $this->observers = $observers;
     }
 
     /**
@@ -72,6 +78,10 @@ class Kernel {
             Set $taskSet,
             Gate|IO|null $gateOrReturn
     ): Gate|IO|null {
+        if ($this->observers) {
+            $this->observers->notify($gateOrReturn);
+            $this->observers->notify($gateOrReturn->getIO());
+        }
         if ($gateOrReturn instanceof XorGate) {
             $this->completeTaskSets[] = $taskSet;
             return $this->processTaskSet(

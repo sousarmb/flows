@@ -26,36 +26,14 @@
 
 declare(strict_types=1);
 
-namespace Flow\Gates;
+namespace Flow\Contracts;
 
-use Flow\Contracts\Gate as iGate;
-use Collectibles\Contracts\IO;
-
-abstract class Gate implements iGate {
-
-    protected ?IO $io;
+interface Observer {
 
     /**
      * 
-     * @param IO|null $io
-     * @return self
-     */
-    public function setIO(?IO $io = null): self {
-        $this->io = $io;
-        return $this;
-    }
-
-    /**
-     * 
-     * @return IO|null
-     */
-    public function getIO(): ?IO {
-        return $this->io;
-    }
-
-    /**
-     * 
+     * @param object $subject
      * @return void
      */
-    public function cleanUp(): void {}
+    public function observe(object $subject): void;
 }

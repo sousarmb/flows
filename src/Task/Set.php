@@ -3,7 +3,7 @@
 /*
  * The MIT License
  *
- * Copyright 2024 rsousa.
+ * Copyright 2024 rsousa <rmbsousa@gmail.com>.
  *
  * Permission is hereby granted, free of charge, to any person obtaining a copy
  * of this software and associated documentation files (the "Software"), to deal
