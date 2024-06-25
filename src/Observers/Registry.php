@@ -37,6 +37,9 @@ use ReflectionClass;
 class Registry {
 
     private array $observerOf = [];
+    private array $errors = [
+        'Subject class %s must implement one of : %s | %s'
+    ];
 
     /**
      * 
@@ -50,7 +53,14 @@ class Registry {
             string $subject
     ): self {
         if (!$this->isValid($subject, true)) {
-            throw new LogicException('Subject class ' . $subject . ' must implement one of : ' . IO::class . ' | ' . Gate::class);
+            throw new LogicException(
+                            sprintf(
+                                    $this->errors[0],
+                                    $subject,
+                                    IO::class,
+                                    Gate::class
+                            )
+            );
         }
         if (!array_key_exists($subject, $this->observers)) {
             $this->observerOf[$subject] = [];
