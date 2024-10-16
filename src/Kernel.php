@@ -40,24 +40,21 @@ use Flow\Observers\Registry as ObserverRegistry;
 
 class Kernel {
 
-    private TaskRegistry $taskSets;
-    private ObserverRegistry $observers;
     private array $completeTaskSets = [];
     private array $errors = [
         'Inclusive (OR) gates must return at least 1 or more set of tasks to follow'
     ];
+    private ?string $firstTaskSet = null;
+    private bool $running = false;
 
     /**
      * 
      * @param Registry $taskSets
      */
     public function __construct(
-            TaskRegistry $taskSets,
-            ?ObserverRegistry $observers
-    ) {
-        $this->taskSets = $taskSets;
-        $this->observers = $observers;
-    }
+            private TaskRegistry $taskSets,
+            private ?ObserverRegistry $observers = null
+    ) {}
 
     /**
      * 
@@ -79,8 +76,9 @@ class Kernel {
             Gate|IO|null $gateOrReturn
     ): Gate|IO|null {
         if ($this->observers) {
-            $this->observers->notify($gateOrReturn);
-            $this->observers->notify($gateOrReturn->getIO());
+            $this->observers->notify(
+                    $gateOrReturn instanceof Gate ? $gateOrReturn->getIO() : $gateOrReturn
+            );
         }
         if ($gateOrReturn instanceof XorGate) {
             $this->completeTaskSets[] = $taskSet;
@@ -124,12 +122,30 @@ class Kernel {
             string $classNameTaskSet,
             ?IO $io = null
     ): Gate|IO|null {
+        if (!$this->running) {
+            $this->running = !$this->running;
+        }
         $taskSet = $this->taskSets->getNamed($classNameTaskSet);
+        if (!$this->firstTaskSet) {
+            $this->firstTaskSet = $classNameTaskSet;
+        }
+
         $gateOrReturn = $this->processGateOrReturn(
                 $taskSet,
                 $taskSet->process($io)
         );
         $taskSet->cleanUp();
+        // have we reached the last task set?
+        if ($classNameTaskSet === $this->firstTaskSet) {
+            // yes (recursion)
+            if ($this->running) {
+                $this->running = !$this->running;
+            }
+            if ($this->observers) {
+                $this->observers->notifyDeferred();
+            }
+        }
+
         return $gateOrReturn;
     }
 
