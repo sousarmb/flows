@@ -29,44 +29,73 @@ declare(strict_types=1);
 namespace Flow\Observers;
 
 use Collectibles\Contracts\IO;
+use Flow\Contracts\Deferred;
 use Flow\Contracts\Observer;
 use Flow\Contracts\Gate;
 use LogicException;
 use ReflectionClass;
+use SplQueue;
 
 class Registry {
 
-    private array $observerOf = [];
+    private array $deferred = [
+        '*' => []
+    ];
+    private array $deferredSubjects = [];
+    private array $realtime = [
+        '*' => []
+    ];
     private array $errors = [
         'Subject class %s must implement one of : %s | %s'
     ];
+    private bool $hasDeferredAllObserver = false;
+    private bool $hasRealTimeAllObserver = false;
+
+    public function __construct() {
+        $this->deferredSubjects['*'] = new SplQueue();
+    }
 
     /**
-     * 
-     * @param Observer $observer
-     * @param string $subject
+     *
+     * @param Deferred|Observer $observer
+     * @param string $nsSubjectClass
      * @return self
      * @throws LogicException
      */
     public function register(
-            Observer $observer,
-            string $subject
+            Deferred|Observer $observer,
+            string $nsSubjectClass
     ): self {
-        if (!$this->isValid($subject, true)) {
+        $observersKey = $observer instanceof Deferred ? 'deferred' : 'realtime';
+        if ($nsSubjectClass == '*') {
+            // flags to prevent array count()s later
+            if ($observersKey == 'deferred') {
+                $this->hasDeferredAllObserver = true;
+            } else {
+                $this->hasRealTimeAllObserver = true;
+            }
+        } elseif ($this->isValidSubject($nsSubjectClass)) {
+            if (!isset(
+                            $nsSubjectClass,
+                            $this->{$observersKey}
+                    )
+            ) {
+                $this->{$observersKey}[$nsSubjectClass] = [];
+            }
+        } else {
             throw new LogicException(
-                sprintf(
-                    $this->errors[0],
-                    $subject,
-                    IO::class,
-                    Gate::class
-                )
+                            sprintf(
+                                    $this->errors[0],
+                                    $nsSubjectClass,
+                                    IO::class,
+                                    Gate::class
+                            )
             );
         }
-        if (!array_key_exists($subject, $this->observers)) {
-            $this->observerOf[$subject] = [];
-        }
 
-        $this->observerOf[$subject][] = $observer;
+        $this->{$observersKey}[$nsSubjectClass][] = $observer;
+
+        return $this;
     }
 
     /**
@@ -75,25 +104,96 @@ class Registry {
      * @return void
      */
     public function notify(IO|Gate $subject): void {
-        foreach ($this->observerOf[get_class($subject)] as $observer) {
-            $observer->observe($subject);
+        $nsSubjectClass = get_class($subject);
+        // check if there are any observers of this subject
+        if (isset($this->realtime[$nsSubjectClass])) {
+            // notify real-time observers of this subject
+            foreach ($this->realtime[$nsSubjectClass] as $observers) {
+                foreach ($observers as $observer) {
+                    $observer($subject);
+                }
+            }
+        }
+        if ($this->hasRealTimeAllObserver) {
+            // notify real-time observers for all subjects
+            foreach ($this->realtime['*'] as $observer) {
+                $observer($subject);
+            }
+        }
+        if (isset($this->deferred[$nsSubjectClass])) {
+            // there are, store the subject to notify observers later
+            if (!isset($this->deferredSubjects[$nsSubjectClass])) {
+                $this->deferredSubjects[$nsSubjectClass] = new SplQueue();
+            } elseif ($this->isDeferredSubjectRegistered(
+                            $nsSubjectClass,
+                            $subject
+                    )
+            ) {
+                // prevent duplicate subject registration
+                return;
+            }
+
+            $this->deferredSubjects[$nsSubjectClass][] = $subject;
+        } elseif ($this->hasDeferredAllObserver) {
+            // and this is in case there any deferred "observe all subjects"
+            // observers
+            if ($this->isDeferredSubjectRegistered(
+                            '*',
+                            $subject
+                    )
+            ) {
+                // prevent duplicate subject registration
+                return;
+            }
+
+            $this->deferredSubjects['*'][] = $subject;
         }
     }
 
     /**
      * 
-     * @param string $instanceOrFQDN
-     * @param bool $observerOrSubject
+     * @return void
+     */
+    public function notifyDeferred(): void {
+        foreach ($this->deferredSubjects as $nsSubjectClass => $subjects) {
+            foreach ($subjects as $subject) {
+                foreach ($this->deferred[$nsSubjectClass] as $observer) {
+                    $observer($subject);
+                }
+            }
+        }
+    }
+
+    /**
+     *
+     * @param string $nsSubjectClass
      * @return bool
      */
-    private function isValid(
-            string|object $instanceOrFQDN,
-            bool $observerOrSubject
-    ): bool {
-        $reflection = new ReflectionClass($instanceOrFQDN);
+    private function isValidSubject(string $nsSubjectClass): bool {
+        $reflection = new ReflectionClass($nsSubjectClass);
 
-        return $observerOrSubject 
-                ? $reflection->implementsInterface(Gate::class) || $class->implementsInterface(IO::class) 
-                : $reflection->implementsInterface(Observer::class);
+        return $reflection->implementsInterface(Gate::class) || $reflection->implementsInterface(IO::class);
+    }
+
+    /**
+     * 
+     * @param string $nsSubjectClass
+     * @param object $subject
+     * @return bool
+     */
+    private function isDeferredSubjectRegistered(
+            string $nsSubjectClass,
+            object $subject
+    ): bool {
+        $this->deferredSubjects[$nsSubjectClass]->rewind();
+        do {
+            if ($this->deferredSubjects[$nsSubjectClass]->current() === $subject) {
+                return true;
+            }
+
+            $this->deferredSubjects[$nsSubjectClass]->next();
+        } while ($this->deferredSubjects[$nsSubjectClass]->valid());
+
+        return false;
     }
 }

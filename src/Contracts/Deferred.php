@@ -28,12 +28,7 @@ declare(strict_types=1);
 
 namespace Flow\Contracts;
 
-interface Observer {
+interface Deferred extends Observer {
 
-    /**
-     * 
-     * @param object $subject
-     * @return void
-     */
-    public function __invoke(object $subject): void;
+    public const IS_DEFERRED = true;
 }
