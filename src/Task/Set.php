@@ -86,7 +86,7 @@ abstract class Set {
      * @return int|null
      */
     public function getCurrentTaskKey(): ?int {
-        return key($this->task);
+        return key($this->tasks);
     }
 
     /**
@@ -128,14 +128,15 @@ abstract class Set {
             throw new LogicException($this->errors[2]);
         }
 
-        $current = next($this->tasks);
+        $current = next($this->tasks); // watch out: we may be out of bounds!
         do {
             if ($current instanceof XorGate) {
                 end($this->tasks);
                 return $current->setIO($io);
             } elseif ($current instanceof OrGate) {
                 return $current->setIO($io);
-            } else {
+            } elseif ($current) {
+                // ... but if not, process the task
                 $io = $current($io);
             }
         } while ($current = next($this->tasks));
