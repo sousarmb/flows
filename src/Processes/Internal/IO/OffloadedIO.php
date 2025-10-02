@@ -26,39 +26,17 @@
 
 declare(strict_types=1);
 
-namespace Flows\Gates;
+namespace Flows\Processes\Internal\IO;
 
 use Collectibles\Contracts\IO;
-use Flows\Contracts\Gate as iGate;
 
-abstract class Gate implements iGate
+readonly class OffloadedIO extends ContentTerminatorIO
 {
-
-    protected ?IO $io;
-
-    /**
-     * 
-     * @param IO|null $io
-     * @return self
-     */
-    public function setIO(?IO $io = null): self
-    {
-        $this->io = $io;
-        return $this;
+    public function __construct(
+        protected array $processes,
+        protected ?IO $processIO = null,
+        ?string $contentTerminator = null
+    ) {
+        parent::__construct($contentTerminator);
     }
-
-    /**
-     * 
-     * @return IO|null
-     */
-    public function getIO(): ?IO
-    {
-        return $this->io;
-    }
-
-    /**
-     * 
-     * @return void
-     */
-    public function cleanUp(): void {}
 }

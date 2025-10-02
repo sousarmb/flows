@@ -26,39 +26,17 @@
 
 declare(strict_types=1);
 
-namespace Flows\Gates;
+namespace Flows\Processes\Internal\IO;
 
-use Collectibles\Contracts\IO;
-use Flows\Contracts\Gate as iGate;
+use Collectibles\IO;
+use Ramsey\Uuid\Uuid;
 
-abstract class Gate implements iGate
+readonly class ContentTerminatorIO extends IO
 {
+    protected string $contentTerminator;
 
-    protected ?IO $io;
-
-    /**
-     * 
-     * @param IO|null $io
-     * @return self
-     */
-    public function setIO(?IO $io = null): self
+    public function __construct(?string $contentTerminator = null)
     {
-        $this->io = $io;
-        return $this;
+        $this->contentTerminator = $contentTerminator ?? '---' . Uuid::uuid4()->toString() . '---';
     }
-
-    /**
-     * 
-     * @return IO|null
-     */
-    public function getIO(): ?IO
-    {
-        return $this->io;
-    }
-
-    /**
-     * 
-     * @return void
-     */
-    public function cleanUp(): void {}
 }

@@ -26,17 +26,18 @@
 
 declare(strict_types=1);
 
-namespace Flow\Observers;
+namespace Flows\Observers;
 
 use Collectibles\Contracts\IO;
-use Flow\Contracts\Deferred;
-use Flow\Contracts\Observer;
-use Flow\Contracts\Gate;
+use Flows\Contracts\Deferred;
+use Flows\Contracts\Gate;
+use Flows\Contracts\Observer;
 use LogicException;
 use ReflectionClass;
 use SplQueue;
 
-class Registry {
+class Registry
+{
 
     private array $deferred = [
         '*' => []
@@ -51,7 +52,8 @@ class Registry {
     private bool $hasDeferredAllObserver = false;
     private bool $hasRealTimeAllObserver = false;
 
-    public function __construct() {
+    public function __construct()
+    {
         $this->deferredSubjects['*'] = new SplQueue();
     }
 
@@ -63,8 +65,8 @@ class Registry {
      * @throws LogicException
      */
     public function register(
-            Deferred|Observer $observer,
-            string $nsSubjectClass
+        Deferred|Observer $observer,
+        string $nsSubjectClass
     ): self {
         $observersKey = $observer instanceof Deferred ? 'deferred' : 'realtime';
         if ($nsSubjectClass == '*') {
@@ -76,20 +78,19 @@ class Registry {
             }
         } elseif ($this->isValidSubject($nsSubjectClass)) {
             if (!isset(
-                            $nsSubjectClass,
-                            $this->{$observersKey}
-                    )
-            ) {
+                $nsSubjectClass,
+                $this->{$observersKey}
+            )) {
                 $this->{$observersKey}[$nsSubjectClass] = [];
             }
         } else {
             throw new LogicException(
-                            sprintf(
-                                    $this->errors[0],
-                                    $nsSubjectClass,
-                                    IO::class,
-                                    Gate::class
-                            )
+                sprintf(
+                    $this->errors[0],
+                    $nsSubjectClass,
+                    IO::class,
+                    Gate::class
+                )
             );
         }
 
@@ -103,7 +104,8 @@ class Registry {
      * @param IO|Gate $subject
      * @return void
      */
-    public function notify(IO|Gate $subject): void {
+    public function notify(IO|Gate $subject): void
+    {
         $nsSubjectClass = get_class($subject);
         // check if there are any observers of this subject
         if (isset($this->realtime[$nsSubjectClass])) {
@@ -125,10 +127,9 @@ class Registry {
             if (!isset($this->deferredSubjects[$nsSubjectClass])) {
                 $this->deferredSubjects[$nsSubjectClass] = new SplQueue();
             } elseif ($this->isDeferredSubjectRegistered(
-                            $nsSubjectClass,
-                            $subject
-                    )
-            ) {
+                $nsSubjectClass,
+                $subject
+            )) {
                 // prevent duplicate subject registration
                 return;
             }
@@ -138,10 +139,9 @@ class Registry {
             // and this is in case there any deferred "observe all subjects"
             // observers
             if ($this->isDeferredSubjectRegistered(
-                            '*',
-                            $subject
-                    )
-            ) {
+                '*',
+                $subject
+            )) {
                 // prevent duplicate subject registration
                 return;
             }
@@ -154,7 +154,8 @@ class Registry {
      * 
      * @return void
      */
-    public function notifyDeferred(): void {
+    public function notifyDeferred(): void
+    {
         foreach ($this->deferredSubjects as $nsSubjectClass => $subjects) {
             foreach ($subjects as $subject) {
                 foreach ($this->deferred[$nsSubjectClass] as $observer) {
@@ -169,7 +170,8 @@ class Registry {
      * @param string $nsSubjectClass
      * @return bool
      */
-    private function isValidSubject(string $nsSubjectClass): bool {
+    private function isValidSubject(string $nsSubjectClass): bool
+    {
         $reflection = new ReflectionClass($nsSubjectClass);
 
         return $reflection->implementsInterface(Gate::class) || $reflection->implementsInterface(IO::class);
@@ -182,8 +184,8 @@ class Registry {
      * @return bool
      */
     private function isDeferredSubjectRegistered(
-            string $nsSubjectClass,
-            object $subject
+        string $nsSubjectClass,
+        object $subject
     ): bool {
         $this->deferredSubjects[$nsSubjectClass]->rewind();
         do {

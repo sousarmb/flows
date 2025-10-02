@@ -26,9 +26,10 @@
 
 declare(strict_types=1);
 
-namespace Flow\Contracts;
+namespace Flows\Contracts;
 
-interface Observer {
+interface Observer
+{
 
     /**
      * 

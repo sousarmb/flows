@@ -26,117 +26,137 @@
 
 declare(strict_types=1);
 
-namespace Flow;
+namespace Flows;
 
-use LogicException;
 use Collectibles\Collection;
 use Collectibles\Contracts\IO;
-use Flow\Task\Registry as TaskRegistry;
-use Flow\Task\Set;
-use Flow\Gates\XorGate;
-use Flow\Gates\OrGate;
-use Flow\Contracts\Gate;
-use Flow\Observers\Registry as ObserverRegistry;
+use Flows\Contracts\Gate;
+use Flows\Gates\OffloadOrGate;
+use Flows\Gates\OrGate;
+use Flows\Gates\XorGate;
+use Flows\Observers\Registry as ObserverRegistry;
+use Flows\Processes\Internal\IO\OffloadedIO;
+use Flows\Processes\Internal\OffloadProcess;
+use Flows\Processes\Process;
+use Flows\Processes\Registry as ProcessRegistry;
+use LogicException;
 
-class Kernel {
+class Kernel
+{
 
-    private array $completeTaskSets = [];
+    private array $completedProcesses = [];
     private array $errors = [
-        'Inclusive (OR) gates must return at least 1 or more set of tasks to follow'
+        'Inclusive (OR) gates must return at least 1 or more set of processes to follow'
     ];
-    private ?string $firstTaskSet = null;
+    private ?string $firstProcess = null;
     private bool $running = false;
 
     /**
      * 
-     * @param Registry $taskSets
+     * @param ProcessRegistry $processes
      */
     public function __construct(
-            private TaskRegistry $taskSets,
-            private ?ObserverRegistry $observers = null
+        private ProcessRegistry $processes,
+        private ?ObserverRegistry $observers = null
     ) {}
 
     /**
      * 
      * @return array
      */
-    public function getProcessedTaskSetsFlow(): array {
-        return $this->completeTaskSets;
+    public function getCompletedProcesses(): array
+    {
+        return $this->completedProcesses;
     }
 
     /**
      * 
-     * @param Set $taskSet
+     * @param Process $process
      * @param Gate|IO|null $gateOrReturn
      * @return Gate|IO|null
      * @throws LogicException
      */
     private function processGateOrReturn(
-            Set $taskSet,
-            Gate|IO|null $gateOrReturn
+        Process $process,
+        Gate|IO|null $gateOrReturn
     ): Gate|IO|null {
         if ($this->observers) {
             $this->observers->notify(
-                    $gateOrReturn instanceof Gate ? $gateOrReturn->getIO() : $gateOrReturn
+                $gateOrReturn instanceof Gate ? $gateOrReturn->getIO() : $gateOrReturn
             );
         }
         if ($gateOrReturn instanceof XorGate) {
-            $this->completeTaskSets[] = $taskSet;
-            return $this->processTaskSet(
-                            $gateOrReturn(),
-                            $gateOrReturn->getIO()
+            $this->completedProcesses[] = $process;
+            return $this->processProcess(
+                $gateOrReturn(),
+                $gateOrReturn->getIO()
             );
+        } elseif ($gateOrReturn instanceof OffloadOrGate) {
+            $offloadOrProcesses = $gateOrReturn();
+            if (empty($offloadOrProcesses)) {
+                throw new LogicException($this->errors[0]);
+            }
+
+            $offloadProcess = new OffloadProcess();
+            $processesReturn = $offloadProcess->process(
+                new OffloadedIO($offloadOrProcesses, $gateOrReturn->getIO())
+            );
+            $this->resumeProcess(
+                $process,
+                $processesReturn
+            );
+            return $processesReturn;
         } elseif ($gateOrReturn instanceof OrGate) {
-            $orTaskSets = $gateOrReturn();
-            if (empty($orTaskSets)) {
+            $orProcesses = $gateOrReturn();
+            if (empty($orProcesses)) {
                 throw new LogicException($this->errors[0]);
             }
 
             $orGateIo = new Collection(IO::class);
-            foreach ($orTaskSets as $orTaskSet) {
+            foreach ($orProcesses as $orProcess) {
                 $orGateIo->set(
-                        $this->processTaskSet(
-                                $orTaskSet,
-                                $gateOrReturn->getIO()
-                        )
+                    $this->processProcess(
+                        $orProcess,
+                        $gateOrReturn->getIO()
+                    )
                 );
             }
-            $this->resumeTaskSet(
-                    $taskSet,
-                    $orGateIo
+            $this->resumeProcess(
+                $$process,
+                $orGateIo
             );
             return $orGateIo;
         }
 
-        $this->completeTaskSets[] = $taskSet;
+        $this->completedProcesses[] = $process;
         return $gateOrReturn;
     }
 
     /**
      * 
-     * @param string $classNameTaskSet
+     * @param string $classNameProcess
      * @param IO|null $io
      * @return Gate|IO|null
      */
-    public function processTaskSet(
-            string $classNameTaskSet,
-            ?IO $io = null
+    public function processProcess(
+        string $classNameProcess,
+        ?IO $io = null
     ): Gate|IO|null {
         if (!$this->running) {
             $this->running = !$this->running;
         }
-        $taskSet = $this->taskSets->getNamed($classNameTaskSet);
-        if (!$this->firstTaskSet) {
-            $this->firstTaskSet = $classNameTaskSet;
+        $process = $this->processes->getNamed($classNameProcess);
+        if (!$this->firstProcess) {
+            $this->firstProcess = $classNameProcess;
         }
 
         $gateOrReturn = $this->processGateOrReturn(
-                $taskSet,
-                $taskSet->process($io)
+            $process,
+            $process->process($io)
         );
-        $taskSet->cleanUp();
-        // have we reached the last task set?
-        if ($classNameTaskSet === $this->firstTaskSet) {
+        $process->cleanUp();
+        // have we reached the last process?
+        if ($classNameProcess === $this->firstProcess) {
             // yes (recursion)
             if ($this->running) {
                 $this->running = !$this->running;
@@ -151,17 +171,17 @@ class Kernel {
 
     /**
      * 
-     * @param Set $taskSet
+     * @param Process $process
      * @param Collection $io
      * @return Gate|IO|null
      */
-    private function resumeTaskSet(
-            Set $taskSet,
-            Collection $io
+    private function resumeProcess(
+        Process $process,
+        Collection $io
     ): Gate|IO|null {
         return $this->processGateOrReturn(
-                        $taskSet,
-                        $taskSet->resume($io)
+            $process,
+            $process->resume($io)
         );
     }
 }
