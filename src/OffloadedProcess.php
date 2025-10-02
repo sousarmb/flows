@@ -26,57 +26,39 @@
 
 declare(strict_types=1);
 
-namespace Flow\Task;
+use Flows\Kernel;
+use Flows\Processes\Internal\IO\OffloadedIO;
+use Flows\Processes\Registry;
+use Monolog\ErrorHandler;
+use Monolog\Handler\StreamHandler;
+use Monolog\Level;
+use Monolog\Logger;
 
-use Flow\Task\Set;
-use RuntimeException;
+require __DIR__ . '/../vendor/autoload.php';
 
-class Registry {
+// $logger = new Logger('my_logger');
+// $logger->pushHandler(new StreamHandler(__DIR__ . '/app/logs/app.log', Level::Debug));
+// ErrorHandler::register($logger);
 
-    private array $taskSets = [];
-    private Set $current;
+$line = trim(fgets(STDIN));
+fclose(STDIN);
+list($process, $contentTerminator, $processIO) = explode('|', $line);
+$registry = new Registry();
+$process = new $process();
 
-    /**
-     * 
-     * @param Set $taskSet
-     * @return self
-     */
-    public function add(Set $taskSet): self {
-        $this->taskSets[get_class($taskSet)] = $taskSet;
-        return $this;
-    }
-    
-    /**
-     * 
-     * @return Set
-     */
-    public function getCurrentTaskSet(): Set {
-        return $this->current;
-    }
+$registry->add($process);
 
-    /**
-     * 
-     * @param string $classNameTaskSet
-     * @return Set
-     * @throws RuntimeException
-     */
-    public function getNamed(string $classNameTaskSet): Set {
-        if ($this->exists($classNameTaskSet)) {
-            return $this->current = $this->taskSets[$classNameTaskSet];
-        }
+// what if you need more than one process?
 
-        throw new RuntimeException('Unregistered task set ' . $classNameTaskSet);
-    }
+$kernel = new Kernel($registry);
+$return = $kernel->processProcess(
+    get_class($process),
+    unserialize(base64_decode($processIO))
+);
+fwrite(STDOUT, base64_encode(serialize($return)) . PHP_EOL);
+fflush(STDOUT);
+fwrite(STDOUT, $contentTerminator . PHP_EOL);
+fflush(STDOUT);
 
-    /**
-     * 
-     * @param string $classNameTaskSet
-     * @return bool
-     */
-    public function exists(string $classNameTaskSet): bool {
-        return array_key_exists(
-                $classNameTaskSet,
-                $this->taskSets
-        );
-    }
-}
+fclose(STDOUT);
+exit(0);

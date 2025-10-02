@@ -26,39 +26,60 @@
 
 declare(strict_types=1);
 
-namespace Flows\Gates;
+namespace Flows\Processes;
 
-use Collectibles\Contracts\IO;
-use Flows\Contracts\Gate as iGate;
+use RuntimeException;
 
-abstract class Gate implements iGate
+class Registry
 {
-
-    protected ?IO $io;
+    private array $processes = [];
+    private Process $current;
 
     /**
      * 
-     * @param IO|null $io
+     * @param Process $process
      * @return self
      */
-    public function setIO(?IO $io = null): self
+    public function add(Process $process): self
     {
-        $this->io = $io;
+        $this->processes[get_class($process)] = $process;
         return $this;
     }
 
     /**
      * 
-     * @return IO|null
+     * @return Process
      */
-    public function getIO(): ?IO
+    public function getCurrentProcess(): Process
     {
-        return $this->io;
+        return $this->current;
     }
 
     /**
      * 
-     * @return void
+     * @param string $classNameProcess
+     * @return Process
+     * @throws RuntimeException
      */
-    public function cleanUp(): void {}
+    public function getNamed(string $classNameProcess): Process
+    {
+        if ($this->exists($classNameProcess)) {
+            return $this->current = $this->processes[$classNameProcess];
+        }
+
+        throw new RuntimeException('Unregistered process ' . $classNameProcess);
+    }
+
+    /**
+     * 
+     * @param string $classNameProcess
+     * @return bool
+     */
+    public function exists(string $classNameProcess): bool
+    {
+        return array_key_exists(
+            $classNameProcess,
+            $this->processes
+        );
+    }
 }

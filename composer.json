@@ -5,8 +5,8 @@
     "license": "MIT",
     "autoload": {
         "psr-4": {
-            "App\\": "App/",
-            "Flow\\": "src/"
+            "App\\": "app/",
+            "Flows\\": "src/"
         }
     },
     "authors": [
@@ -17,6 +17,8 @@
     ],
     "require": {
         "php": ">=8.2",
-        "rsousa/collectibles": "^1.0"
+        "rsousa/collectibles": "^1.0",
+        "ramsey/uuid": "^4.9",
+        "monolog/monolog": "^3.9"
     }
 }

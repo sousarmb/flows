@@ -26,22 +26,23 @@
 
 declare(strict_types=1);
 
-namespace Flow\Task;
+namespace Flows\Processes;
 
-use Flow\Gates\OrGate;
-use Flow\Gates\XorGate;
-use Flow\Contracts\Gate;
-use Flow\Contracts\Task;
 use Collectibles\Collection;
 use Collectibles\Contracts\IO;
+use Flows\Contracts\Gate;
+use Flows\Contracts\Task;
+use Flows\Gates\OrGate;
+use Flows\Gates\XorGate;
 use LogicException;
 
-abstract class Set {
+abstract class Process
+{
 
     protected array $tasks = [];
     protected array $errors = [
-        'Invalid task set',
-        'This task set is done',
+        'Invalid process',
+        'These tasks are done',
         'Resume only after OrGate instance'
     ];
 
@@ -49,15 +50,17 @@ abstract class Set {
      * 
      * @throws LogicException
      */
-    public function __construct() {
-        if (empty($this->tasks) || in_array(
-                        false,
-                        array_map(
-                                fn($task) => $task instanceof Task || $task instanceof Gate,
-                                $this->tasks
-                        ),
-                        true
-                )
+    public function __construct()
+    {
+        if (
+            empty($this->tasks) || in_array(
+                false,
+                array_map(
+                    fn($task) => $task instanceof Task || $task instanceof Gate,
+                    $this->tasks
+                ),
+                true
+            )
         ) {
             throw new LogicException($this->errors[0]);
         }
@@ -67,7 +70,8 @@ abstract class Set {
      * 
      * @return void
      */
-    public function cleanUp(): void {
+    public function cleanUp(): void
+    {
         for ($i = count($this->tasks) - 1; $i >= 0; $i--) {
             $this->tasks[$i]->cleanUp();
         }
@@ -77,7 +81,8 @@ abstract class Set {
      * 
      * @return bool
      */
-    public function done(): bool {
+    public function done(): bool
+    {
         return key($this->tasks) === null;
     }
 
@@ -85,7 +90,8 @@ abstract class Set {
      * 
      * @return int|null
      */
-    public function getCurrentTaskKey(): ?int {
+    public function getCurrentTaskKey(): ?int
+    {
         return key($this->tasks);
     }
 
@@ -95,7 +101,8 @@ abstract class Set {
      * @return Gate|IO|null
      * @throws LogicException
      */
-    public function process(?IO $io = null): Gate|IO|null {
+    public function process(?IO $io = null): Gate|IO|null
+    {
         if ($this->done()) {
             throw new LogicException($this->errors[1]);
         }
@@ -121,7 +128,8 @@ abstract class Set {
      * @return Gate|IO|null
      * @throws LogicException
      */
-    public function resume(?Collection $io = null): Gate|IO|null {
+    public function resume(?Collection $io = null): Gate|IO|null
+    {
         if ($this->done()) {
             throw new LogicException($this->errors[1]);
         } elseif (!(current($this->tasks) instanceof OrGate)) {

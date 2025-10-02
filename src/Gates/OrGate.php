@@ -26,11 +26,10 @@
 
 declare(strict_types=1);
 
-namespace Flow\Gates;
+namespace Flows\Gates;
 
-use Flow\Gates\Gate;
-
-abstract class OrGate extends Gate {
+abstract class OrGate extends Gate
+{
 
     abstract public function __invoke(): array;
 }

@@ -26,12 +26,12 @@
 
 declare(strict_types=1);
 
-namespace Flow\Contracts;
+namespace Flows\Contracts;
 
-use Flow\Contracts\CleanUp;
 use Collectibles\Contracts\IO;
 
-interface Gate extends CleanUp {
+interface Gate extends CleanUp
+{
 
     /**
      * 
