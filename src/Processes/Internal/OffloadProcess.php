@@ -1,0 +1,148 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Flows\Processes\Internal;
+
+use Collectibles\Contracts\IO;
+use Flows\Contracts\Tasks\Task;
+use Flows\Processes\Internal\IO\OffloadedIO;
+use Flows\Processes\Process;
+use Flows\Reactor\Reactor;
+use Flows\Traits\OffloadedProcess;
+use RuntimeException;
+
+class OffloadProcess extends Process
+{
+    public function __construct()
+    {
+        $this->tasks = [
+            new class implements Task {
+                public function __invoke(?IO $io = null): ?IO
+                {
+                    // change to OffloadedProcess.php script directory
+                    if (!chdir(__DIR__ . '/../..')) {
+                        throw new RuntimeException('Could not change to OffloadedProcess.php script directory');
+                    }
+                    if (!is_readable('OffloadedProcess.php')) {
+                        throw new RuntimeException('Could not find or read OffloadedProcess.php script');
+                    }
+
+                    return $io;
+                }
+
+                public function cleanUp(): void
+                {
+                }
+            },
+            new class implements Task {
+                public function __invoke(?IO $io = null): ?IO
+                {
+                    $descriptorSpec = [
+                        0 => ['pipe', 'r'], // STDIN (write to child process)
+                        1 => ['pipe', 'w'], // STDOUT (read from child process)
+                        2 => ['pipe', 'w'], // STDERR
+                    ];
+                    $processes = [];
+                    foreach ($io->get('processes') as $processName) {
+                        $process = proc_open(
+                            ['php', 'OffloadedProcess.php'],
+                            $descriptorSpec,
+                            $pipes,
+                            getcwd()
+                        );
+                        stream_set_blocking($pipes[0], false);
+                        stream_set_blocking($pipes[1], false);
+                        // store process data for further use
+                        $processes[$processName] = [$process, $pipes[0], $pipes[1], $pipes[2]];
+                    }
+                    return new OffloadedIO($processes, $io->get('processIO'), $io->get('contentTerminator'));
+                }
+
+                public function cleanUp(): void
+                {
+                }
+            },
+            new class implements Task {
+                use OffloadedProcess;
+
+                private array $processes;
+                public function __invoke(?IO $io = null): ?IO
+                {
+                    $this->processes = $io->get('processes');
+                    $reactor = new Reactor();
+                    // wait / read process output
+                    foreach ($io->get('processes') as $processName => [$process, $stdin, $stdout, $stderr]) {
+                        $reactor->onWritable($stdin, function ($stream, $reactor) use ($processName, $io) {
+                            // send work to command
+                            $message = sprintf(
+                                '%s|%s|%s' . PHP_EOL,
+                                $processName,
+                                $io->get('contentTerminator'),
+                                base64_encode(serialize($io->get('processIO')))
+                            );
+                            if (!fwrite($stream, $message)) {
+                                throw new RuntimeException("Could not pipe process setup to child process $processName");
+                            }
+                            // setup piped, one less stream to write to
+                            $reactor->remove($stream);
+                        });
+                        $reactor->onReadable($stdout, function ($stream, $reactor) use ($processName, $io) {
+                            // get process data
+                            $data = fgets($stream);
+                            if ($data === $io->get('contentTerminator') . PHP_EOL) {
+                                // return stored, one less stream to listen to
+                                $reactor->remove($stream);
+                            } elseif ($data !== false) {
+                                // store process output in the "processIO" collection
+                                $io->get('processIO')->set(unserialize(base64_decode($data)), $processName);
+                            }
+                        });
+                        // when all processes done, loop terminates itself
+                        // check max_execution_time to force process termination
+                        $maxExecutionTime = ini_get('max_execution_time');
+                        if ($maxExecutionTime > 0) {
+                            // 1 ms before script timeout check if process running
+                            $reactor->addTimer(
+                                $maxExecutionTime - 0.001,
+                                function ($reactor) use ($processName, $process, $stdin, $stdout) {
+                                    if (proc_get_status($process)['running']) {
+                                        // do not listen anymore
+                                        $message = sprintf(
+                                            'Offloaded process - #%s %s - about to exceeded script execution time, ignoring STDIN, STDOUT',
+                                            (int)$process,
+                                            $processName
+                                        );
+                                        trigger_error($message, E_USER_WARNING);
+                                        $reactor->remove($stdin);
+                                        $reactor->remove($stdout);
+                                    }
+                                },
+                                false
+                            );
+                        }
+                    }
+                    $reactor->run();
+                    return $io->get('processIO');
+                }
+
+                public function cleanUp(): void
+                {
+                    foreach ($this->processes as $processName => [$process, $stdin, $stdout, $stderr]) {
+                        // stop, remove process
+                        // $message = sprintf(
+                        //     'Terminate and close offloaded process - #%s %s',
+                        //     (int)$process,
+                        //     $processName
+                        // );
+                        // trigger_error($message, E_USER_NOTICE);
+                        $this->terminateProcess($process);
+                        $this->closeProcess($process);
+                    }
+                }
+            },
+        ];
+
+        parent::__construct();
+    }
+}
