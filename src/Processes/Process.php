@@ -1,29 +1,5 @@
 <?php
 
-/*
- * The MIT License
- *
- * Copyright 2024 rsousa <rmbsousa@gmail.com>.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
 declare(strict_types=1);
 
 namespace Flows\Processes;
@@ -31,54 +7,71 @@ namespace Flows\Processes;
 use Collectibles\Collection;
 use Collectibles\Contracts\IO;
 use Flows\Contracts\Gate;
-use Flows\Contracts\Task;
+use Flows\Contracts\Tasks\Task;
+use Flows\Event\Kernel as EventKernel;
+use Flows\Facades\Container;
+use Flows\Factory;
 use Flows\Gates\OrGate;
 use Flows\Gates\XorGate;
+use Flows\Observer\Kernel as ObserverKernel;
 use LogicException;
 
 abstract class Process
 {
-
     protected array $tasks = [];
     protected array $errors = [
         'Invalid process',
         'These tasks are done',
         'Resume only after OrGate instance'
     ];
+    private ?EventKernel $events = null;
+    private ?ObserverKernel $observers = null;
 
     /**
-     * 
+     *
      * @throws LogicException
      */
     public function __construct()
     {
-        if (
-            empty($this->tasks) || in_array(
-                false,
-                array_map(
-                    fn($task) => $task instanceof Task || $task instanceof Gate,
-                    $this->tasks
-                ),
-                true
-            )
-        ) {
-            throw new LogicException($this->errors[0]);
+        if ([] === $this->tasks) {
+            throw new LogicException('Invalid process: no tasks to process');
+        }
+
+        foreach ($this->tasks as &$task) {
+            if (is_string($task)) {
+                $task = Factory::getClassInstance($task, $task);
+            }
+            if (!$task instanceof Task && !$task instanceof Gate) {
+                throw new LogicException('Invalid task: must be instance of Task or Gate classes');
+            }
+        }
+        // Is flows booting?
+        if (Container::isReady()) {
+            // no, already booted
+            $this->events = Container::get(EventKernel::class);
+            $this->observers = Container::get(ObserverKernel::class);
         }
     }
 
     /**
-     * 
+     *
      * @return void
      */
     public function cleanUp(): void
     {
+        if ($this->observers) {
+            $this->events->handleDeferFromProcess();
+            $this->observers->observe($this);
+            $this->observers->handleDeferFromProcess();
+        }
+
         for ($i = count($this->tasks) - 1; $i >= 0; $i--) {
             $this->tasks[$i]->cleanUp();
         }
     }
 
     /**
-     * 
+     *
      * @return bool
      */
     public function done(): bool
@@ -87,7 +80,7 @@ abstract class Process
     }
 
     /**
-     * 
+     *
      * @return int|null
      */
     public function getCurrentTaskKey(): ?int
@@ -96,7 +89,7 @@ abstract class Process
     }
 
     /**
-     * 
+     *
      * @param IO|null $io
      * @return Gate|IO|null
      * @throws LogicException
@@ -111,11 +104,14 @@ abstract class Process
         do {
             if ($current instanceof XorGate) {
                 end($this->tasks);
-                return $current->setIO($io);
+                $this->makeObservation($current->setIO($io));
+                return $current;
             } elseif ($current instanceof OrGate) {
-                return $current->setIO($io);
+                $this->makeObservation($current->setIO($io));
+                return $current;
             } else {
                 $io = $current($io);
+                $this->makeObservation($io);
             }
         } while ($current = next($this->tasks));
 
@@ -123,7 +119,7 @@ abstract class Process
     }
 
     /**
-     * 
+     *
      * @param Collection|null $io
      * @return Gate|IO|null
      * @throws LogicException
@@ -140,15 +136,25 @@ abstract class Process
         do {
             if ($current instanceof XorGate) {
                 end($this->tasks);
-                return $current->setIO($io);
+                $this->makeObservation($current->setIO($io));
+                return $current;
             } elseif ($current instanceof OrGate) {
-                return $current->setIO($io);
+                $this->makeObservation($current->setIO($io));
+                return $current;
             } elseif ($current) {
                 // ... but if not, process the task
                 $io = $current($io);
+                $this->makeObservation($io);
             }
         } while ($current = next($this->tasks));
 
         return $io;
+    }
+
+    private function makeObservation(object $subject): void
+    {
+        if ($this->observers) {
+            $this->observers->observe($subject);
+        }
     }
 }
