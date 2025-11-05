@@ -1,11 +1,10 @@
 {
     "name": "rsousa/flows",
-    "description": "Business process model in PHP",
+    "description": "PHP application framework inspired on BPMN 1.0",
     "type": "project",
     "license": "MIT",
     "autoload": {
         "psr-4": {
-            "App\\": "App/",
             "Flows\\": "src/"
         }
     },
