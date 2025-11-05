@@ -5,7 +5,7 @@
     "license": "MIT",
     "autoload": {
         "psr-4": {
-            "App\\": "app/",
+            "App\\": "App/",
             "Flows\\": "src/"
         }
     },
@@ -17,8 +17,12 @@
     ],
     "require": {
         "php": ">=8.2",
-        "rsousa/collectibles": "^1.0",
         "ramsey/uuid": "^4.9",
-        "monolog/monolog": "^3.9"
+        "monolog/monolog": "^3.9",
+        "rsousa/collectibles": "^1.2"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^12.4",
+        "squizlabs/php_codesniffer": "^4.0"
     }
 }

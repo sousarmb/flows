@@ -1,36 +1,11 @@
 <?php
 
-/*
- * The MIT License
- *
- * Copyright 2024 rsousa <rmbsousa@gmail.com>.
- *
- * Permission is hereby granted, free of charge, to any person obtaining a copy
- * of this software and associated documentation files (the "Software"), to deal
- * in the Software without restriction, including without limitation the rights
- * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
- * copies of the Software, and to permit persons to whom the Software is
- * furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
- * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
- * THE SOFTWARE.
- */
-
 declare(strict_types=1);
 
 namespace Flows\Processes\Internal;
 
-use Collectibles\Collection;
 use Collectibles\Contracts\IO;
-use Flows\Contracts\Task;
+use Flows\Contracts\Tasks\Task;
 use Flows\Processes\Internal\IO\OffloadedIO;
 use Flows\Processes\Process;
 use Flows\Reactor\Reactor;
@@ -47,7 +22,7 @@ class OffloadProcess extends Process
                 {
                     // change to OffloadedProcess.php script directory
                     if (!chdir(__DIR__ . '/../..')) {
-                        throw new RuntimeException('Could not change ot OffloadedProcess.php script directory');
+                        throw new RuntimeException('Could not change to OffloadedProcess.php script directory');
                     }
                     if (!is_readable('OffloadedProcess.php')) {
                         throw new RuntimeException('Could not find or read OffloadedProcess.php script');
@@ -56,7 +31,9 @@ class OffloadProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(): void
+                {
+                }
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -79,15 +56,20 @@ class OffloadProcess extends Process
                         // store process data for further use
                         $processes[$processName] = [$process, $pipes[0], $pipes[1], $pipes[2]];
                     }
-                    return new OffloadedIO($processes, $io->get('processIO'), contentTerminator: $io->get('contentTerminator'));
+                    return new OffloadedIO($processes, $io->get('processIO'), $io->get('contentTerminator'));
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(): void
+                {
+                }
             },
             new class implements Task {
+                use OffloadedProcess;
+
+                private array $processes;
                 public function __invoke(?IO $io = null): ?IO
                 {
-                    $processReturn = new Collection(null);
+                    $this->processes = $io->get('processes');
                     $reactor = new Reactor();
                     // wait / read process output
                     foreach ($io->get('processes') as $processName => [$process, $stdin, $stdout, $stderr]) {
@@ -105,15 +87,15 @@ class OffloadProcess extends Process
                             // setup piped, one less stream to write to
                             $reactor->remove($stream);
                         });
-                        $reactor->onReadable($stdout, function ($stream, $reactor) use ($processName, $io, $processReturn) {
+                        $reactor->onReadable($stdout, function ($stream, $reactor) use ($processName, $io) {
                             // get process data
                             $data = fgets($stream);
                             if ($data === $io->get('contentTerminator') . PHP_EOL) {
                                 // return stored, one less stream to listen to
                                 $reactor->remove($stream);
                             } elseif ($data !== false) {
-                                // store process output
-                                $processReturn->set(unserialize(base64_decode($data)), $processName);
+                                // store process output in the "processIO" collection
+                                $io->get('processIO')->set(unserialize(base64_decode($data)), $processName);
                             }
                         });
                         // when all processes done, loop terminates itself
@@ -141,33 +123,26 @@ class OffloadProcess extends Process
                         }
                     }
                     $reactor->run();
-                    return $processReturn->set($io->get('processes'), 'processes');
+                    return $io->get('processIO');
                 }
 
-                public function cleanUp(): void {}
-            },
-            new class implements Task {
-                use OffloadedProcess;
-                public function __invoke(?IO $io = null): ?IO
+                public function cleanUp(): void
                 {
-                    foreach ($io->get('processes') as $processName => [$process, $stdin, $stdout, $stderr]) {
+                    foreach ($this->processes as $processName => [$process, $stdin, $stdout, $stderr]) {
                         // stop, remove process
-                        $message = sprintf(
-                            'Terminate and close offloaded process - #%s %s',
-                            (int)$process,
-                            $processName
-                        );
-                        trigger_error($message, E_USER_NOTICE);
+                        // $message = sprintf(
+                        //     'Terminate and close offloaded process - #%s %s',
+                        //     (int)$process,
+                        //     $processName
+                        // );
+                        // trigger_error($message, E_USER_NOTICE);
                         $this->terminateProcess($process);
                         $this->closeProcess($process);
                     }
-                    return $io;
                 }
-
-                public function cleanUp(): void {}
             },
         ];
 
-        return parent::__construct();
+        parent::__construct();
     }
 }
