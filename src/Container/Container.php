@@ -31,7 +31,10 @@ class Container
         string $nsAbstractionOrConcrete,
         ?string $caller = null
     ): object {
-        $entry = $this->providers->get($nsAbstractionOrConcrete);
+        $entry = $this->providers->get($nsAbstractionOrConcrete, null);
+        if (null === $entry) {
+            throw new LogicException("Unregistered service $nsAbstractionOrConcrete, cannot get from container");
+        }
         if ($entry->isSingleton()) {
             if ($this->services->has($nsAbstractionOrConcrete)) {
                 return $this->services->get($nsAbstractionOrConcrete);
