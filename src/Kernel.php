@@ -115,7 +115,7 @@ class Kernel
                 );
             }
             $this->resumeProcess(
-                $$process,
+                $process,
                 $orGateIo
             );
             return $orGateIo;
