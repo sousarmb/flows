@@ -107,11 +107,12 @@ class Kernel
 
             $orGateIo = new Collection(IO::class);
             foreach ($orProcesses as $orProcess) {
-                $orGateIo->set(
+                $orGateIo->add(
                     $this->processProcess(
                         $orProcess,
                         $gateOrReturn->getIO()
-                    )
+                    ),
+                    $orProcess
                 );
             }
             $this->resumeProcess(
