@@ -35,6 +35,7 @@ use Monolog\Level;
 use Monolog\Logger;
 use ReflectionClass;
 use RuntimeException;
+use Composer\InstalledVersions;
 
 class BootProcess extends Process
 {
@@ -47,14 +48,13 @@ class BootProcess extends Process
                     return new Collection();
                 }
 
-                public function cleanUp(): void
-                {
-                }
+                public function cleanUp(): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
                 {
-                    $root_dir = __DIR__ . '/../../../';
+                    $vendorDir = InstalledVersions::getInstallPath('rsousa/flows');
+                    $root_dir = dirname($vendorDir, 5) . '/';
                     $application_dir = $root_dir . 'App/';
                     $config_dir = $application_dir . 'Config/';
                     $log_dir = $application_dir . 'Logs/';
@@ -75,9 +75,7 @@ class BootProcess extends Process
                     );
                 }
 
-                public function cleanUp(): void
-                {
-                }
+                public function cleanUp(): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -91,9 +89,7 @@ class BootProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void
-                {
-                }
+                public function cleanUp(): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -111,9 +107,7 @@ class BootProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void
-                {
-                }
+                public function cleanUp(): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -137,9 +131,7 @@ class BootProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void
-                {
-                }
+                public function cleanUp(): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -197,9 +189,7 @@ class BootProcess extends Process
                     return $io->set($container, Container::class);
                 }
 
-                public function cleanUp(): void
-                {
-                }
+                public function cleanUp(): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -246,9 +236,7 @@ class BootProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void
-                {
-                }
+                public function cleanUp(): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -295,9 +283,7 @@ class BootProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void
-                {
-                }
+                public function cleanUp(): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): IO
@@ -308,9 +294,7 @@ class BootProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void
-                {
-                }
+                public function cleanUp(): void {}
             }
         ];
         parent::__construct();
