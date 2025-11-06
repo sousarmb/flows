@@ -6,6 +6,7 @@ namespace Flows\Processes\Internal;
 
 use Collectibles\Collection;
 use Collectibles\Contracts\IO;
+use Composer\InstalledVersions;
 use Exception;
 use Flows\Attributes\Defer\DeferFromFlow;
 use Flows\Attributes\Defer\DeferFromProcess;
@@ -21,7 +22,6 @@ use Flows\Contracts\Observer;
 use Flows\Contracts\Tasks\Task;
 use Flows\Event\Kernel as EventKernel;
 use Flows\Facades\Config as ConfigFacade;
-use Flows\Facades\Container as ContainerFacade;
 use Flows\Facades\Events as EventFacade;
 use Flows\Facades\Observers as ObserverFacade;
 use Flows\Factory;
@@ -34,8 +34,6 @@ use Monolog\Handler\StreamHandler;
 use Monolog\Level;
 use Monolog\Logger;
 use ReflectionClass;
-use RuntimeException;
-use Composer\InstalledVersions;
 
 class BootProcess extends Process
 {
@@ -96,12 +94,12 @@ class BootProcess extends Process
                 {
                     $config = $io->get(Config::class);
                     if (!chdir($config->get('app.config.directory'))) {
-                        throw new RuntimeException('Could not change to application directory');
+                        throw new Exception('Could not change to application directory');
                     }
 
                     foreach ($config->get('app.config.files') as $file) {
                         if (!is_readable($file)) {
-                            throw new RuntimeException('Could not find or read configuration files');
+                            throw new Exception('Could not find or read configuration files');
                         }
                     }
                     return $io;
@@ -288,6 +286,10 @@ class BootProcess extends Process
             new class implements Task {
                 public function __invoke(?IO $io = null): IO
                 {
+                    if (!chdir($io->get(Config::class)->get('app.directory'))) {
+                        throw new Exception('Could not change to application directory');
+                    }
+
                     $container = $io->get(Container::class);
                     EventFacade::setContainer($container);
                     ObserverFacade::setContainer($container);
