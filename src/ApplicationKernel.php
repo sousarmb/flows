@@ -20,7 +20,7 @@ use Flows\Processes\Process;
 use Flows\Registries\ProcessRegistry;
 use LogicException;
 
-class Kernel
+class ApplicationKernel
 {
     private ProcessRegistry $processes;
     private EventKernel $events;
@@ -178,5 +178,16 @@ class Kernel
             $process,
             $process->resume($io)
         );
+    }
+
+    /**
+     * 
+     * Current process is offloaded?
+     * 
+     * @return bool TRUE if process is offloaded, FALSE otherwise
+     */
+    public static function isOffloadedProcess(): bool
+    {
+        return defined('OFFLOADED_PROCESS');
     }
 }

@@ -2,10 +2,12 @@
 
 declare(strict_types=1);
 
-use Flows\Kernel;
+use Flows\ApplicationKernel;
 use Flows\Registries\ProcessRegistry;
 
-require __DIR__ . '/../vendor/autoload.php';
+define('OFFLOADED_PROCESS', 0);
+
+require __DIR__ . '/../../../../vendor/autoload.php';
 
 ob_start();
 $line = trim(fgets(STDIN));
@@ -14,12 +16,12 @@ list($process, $contentTerminator, $processIO) = explode('|', $line);
 //
 // What if you need more than one process?
 //
-$kernel = new Kernel();
-$kernel->setProcessRegistry(
+$app = new ApplicationKernel();
+$app->setProcessRegistry(
     (new ProcessRegistry())
         ->add(new $process())
 );
-$return = $kernel->processProcess(
+$return = $app->processProcess(
     $process,
     unserialize(base64_decode($processIO))
 );

@@ -12,4 +12,9 @@ class Observers extends Facade
     {
         return self::$container->get(ObserverKernel::class)->$name(...$arguments);
     }
+
+    public static function getServiceInstance(): ObserverKernel
+    {
+        return self::$container->get(ObserverKernel::class);
+    }
 }
