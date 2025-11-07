@@ -33,4 +33,12 @@ abstract class Facade
     {
         return isset(static::$ready);
     }
+
+    /**
+     * 
+     * Get the service instance from the container. 
+     * Must be defined in child class.
+     * Acts as getting the service class from the container.
+     */
+    abstract public static function getServiceInstance(): object;
 }
