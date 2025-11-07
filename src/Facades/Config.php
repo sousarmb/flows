@@ -38,4 +38,9 @@ class Config extends Facade
     {
         return self::$container->get(ConfigService::class)->get('app.config.app');
     }
+
+    public static function getServiceInstance(): ConfigService
+    {
+        return self::$container->get(ConfigService::class);
+    }
 }

@@ -23,6 +23,7 @@ use Flows\Contracts\Tasks\Task;
 use Flows\Event\Kernel as EventKernel;
 use Flows\Facades\Config as ConfigFacade;
 use Flows\Facades\Events as EventFacade;
+use Flows\Facades\Logger as LoggerFacade;
 use Flows\Facades\Observers as ObserverFacade;
 use Flows\Factory;
 use Flows\Observer\Kernel as ObserverKernel;
@@ -84,6 +85,9 @@ class BootProcess extends Process
                     $handler->setFormatter(new LineFormatter(includeStacktraces: true));
                     $logger->pushHandler($handler);
                     ErrorHandler::register($logger);
+                    // Store to be inserted into the service container later
+                    $io->set($logger, Logger::class);
+
                     return $io;
                 }
 
@@ -142,6 +146,7 @@ class BootProcess extends Process
                     }
 
                     $container = new Container();
+                    // Register services into the container
                     foreach ($serviceproviders as $intOrAbstraction => $concreteOrProvider) {
                         $nsAbstractionOrConcrete = is_int($intOrAbstraction) ? $concreteOrProvider : $intOrAbstraction;
                         $abstractionOrConcrete = new ReflectionClass($nsAbstractionOrConcrete);
@@ -182,8 +187,15 @@ class BootProcess extends Process
                         $io->get(Config::class)
                     );
                     ConfigFacade::setContainer($container);
+                    // Register application logger object, some service or provider might need it
+                    $container->register(
+                        new Concrete(Logger::class, false, true, true),
+                        $io->get(Logger::class)
+                    );
+                    LoggerFacade::setContainer($container);
                     // Boot the container
                     $container->boot();
+
                     return $io->set($container, Container::class);
                 }
 

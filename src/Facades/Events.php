@@ -12,4 +12,9 @@ class Events extends Facade
     {
         return self::$container->get(EventKernel::class)->$name(...$arguments);
     }
+
+    public static function getServiceInstance(): EventKernel
+    {
+        return self::$container->get(EventKernel::class);
+    }
 }

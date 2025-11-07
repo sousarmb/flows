@@ -5,7 +5,7 @@ declare(strict_types=1);
 use Flows\Kernel;
 use Flows\Registries\ProcessRegistry;
 
-require __DIR__ . '/../vendor/autoload.php';
+require __DIR__ . '/../../../../vendor/autoload.php';
 
 ob_start();
 $line = trim(fgets(STDIN));
