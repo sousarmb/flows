@@ -151,11 +151,10 @@ class BootProcess extends Process
                         $nsAbstractionOrConcrete = is_int($intOrAbstraction) ? $concreteOrProvider : $intOrAbstraction;
                         $abstractionOrConcrete = new ReflectionClass($nsAbstractionOrConcrete);
 
-                        $attribLazy = $abstractionOrConcrete->getAttributes(Lazy::class);
-                        $attribSingleton = $abstractionOrConcrete->getAttributes(Singleton::class);
-
                         if ($abstractionOrConcrete->isInterface()) {
                             $provider = new ReflectionClass($concreteOrProvider);
+                            $attribLazy = $provider->getAttributes(Lazy::class);
+                            $attribSingleton = $provider->getAttributes(Singleton::class);
                             if ($provider->isInterface()) {
                                 throw new LogicException("$concreteOrProvider: Interfaces are not allowed as service providers");
                             }
@@ -169,6 +168,8 @@ class BootProcess extends Process
                                 )
                             );
                         } else {
+                            $attribLazy = $abstractionOrConcrete->getAttributes(Lazy::class);
+                            $attribSingleton = $abstractionOrConcrete->getAttributes(Singleton::class);
                             $container->register(
                                 new Concrete(
                                     $concreteOrProvider,
