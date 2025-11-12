@@ -39,26 +39,26 @@ class ProcessRegistry
 
     /**
      *
-     * @param string $classNameProcess
+     * @param string $nsProcess
      * @return Process
      * @throws LogicException
      */
-    public function getNamed(string $classNameProcess): Process
+    public function getNamed(string $nsProcess): Process
     {
-        if ($this->exists($classNameProcess)) {
-            return $this->current = $this->processes[$classNameProcess];
+        if ($this->exists($nsProcess)) {
+            return $this->current = $this->processes[$nsProcess];
         }
 
-        throw new LogicException("Unregistered process $classNameProcess");
+        throw new LogicException("Unregistered process $nsProcess");
     }
 
     /**
      *
-     * @param string $classNameProcess
+     * @param string $nsProcess
      * @return bool
      */
-    public function exists(string $classNameProcess): bool
+    public function exists(string $nsProcess): bool
     {
-        return array_key_exists($classNameProcess, $this->processes);
+        return array_key_exists($nsProcess, $this->processes);
     }
 }
