@@ -14,6 +14,11 @@ class Config extends Facade
         return self::$container->get(ConfigService::class)->$name(...$arguments);
     }
 
+    public static function getRootDirectory(): string
+    {
+        return self::$container->get(ConfigService::class)->get('root.directory');
+    }
+
     public static function getApplicationDirectory(): string
     {
         return self::$container->get(ConfigService::class)->get('app.directory');

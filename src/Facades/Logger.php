@@ -21,7 +21,7 @@ class Logger extends Facade
 {
     public static function __callStatic($name, $arguments): mixed
     {
-        return self::$container->get(Logger::class)->$name(...$arguments);
+        return self::$container->get(MonologLogger::class)->$name(...$arguments);
     }
 
     public static function getServiceInstance(): MonologLogger

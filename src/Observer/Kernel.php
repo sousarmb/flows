@@ -17,8 +17,7 @@ class Kernel implements Observer
         private Collection $registry = new Collection(),
         private Collection $deferFromFlow = new Collection(),
         private Collection $deferFromProcess = new Collection()
-    ) {
-    }
+    ) {}
 
     /**
      *
