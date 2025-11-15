@@ -6,6 +6,8 @@ namespace Flows\Processes\Internal;
 
 use Collectibles\Contracts\IO;
 use Flows\Contracts\Tasks\Task;
+use Flows\Facades\Config;
+use Flows\Facades\Logger;
 use Flows\Processes\Internal\IO\OffloadedIO;
 use Flows\Processes\Process;
 use Flows\Reactor\Reactor;
@@ -31,9 +33,7 @@ class OffloadProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void
-                {
-                }
+                public function cleanUp(): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -59,9 +59,7 @@ class OffloadProcess extends Process
                     return new OffloadedIO($processes, $io->get('processIO'), $io->get('contentTerminator'));
                 }
 
-                public function cleanUp(): void
-                {
-                }
+                public function cleanUp(): void {}
             },
             new class implements Task {
                 use OffloadedProcess;
@@ -73,12 +71,25 @@ class OffloadProcess extends Process
                     $reactor = new Reactor();
                     // wait / read process output
                     foreach ($io->get('processes') as $processName => [$process, $stdin, $stdout, $stderr]) {
+                        $reactor->onReadable($stderr, function ($stream, $reactor) use ($processName, $io) {
+                            // get process error data
+                            $tmp = fgets($stream);
+                            if (false === $tmp) return;
+                            $data = '';
+                            do {
+                                $data .= $tmp;
+                                $tmp = fgets($stream);
+                            } while ($tmp);
+                            Logger::alert($data, [$processName, base64_encode(serialize($io))]);
+                            $reactor->remove($stream);
+                        });
                         $reactor->onWritable($stdin, function ($stream, $reactor) use ($processName, $io) {
                             // send work to command
                             $message = sprintf(
-                                '%s|%s|%s' . PHP_EOL,
+                                '%s|%s|%s|%s' . PHP_EOL,
                                 $processName,
                                 $io->get('contentTerminator'),
+                                Config::getRootDirectory(),
                                 base64_encode(serialize($io->get('processIO')))
                             );
                             if (!fwrite($stream, $message)) {
