@@ -7,12 +7,11 @@ use Flows\Registries\ProcessRegistry;
 
 define('OFFLOADED_PROCESS', 0);
 
-require __DIR__ . '/../../../../vendor/autoload.php';
-
 ob_start();
 $line = trim(fgets(STDIN));
 fclose(STDIN);
-list($process, $contentTerminator, $processIO) = explode('|', $line);
+list($process, $contentTerminator, $rootDir, $processIO) = explode('|', $line);
+require $rootDir . 'vendor/autoload.php';
 //
 // What if you need more than one process?
 //
@@ -21,7 +20,7 @@ $app->setProcessRegistry(
     (new ProcessRegistry())
         ->add(new $process())
 );
-$return = $app->processProcess(
+$return = $app->process(
     $process,
     unserialize(base64_decode($processIO))
 );
