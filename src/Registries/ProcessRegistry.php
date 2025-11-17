@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Flows\Registries;
 
+use Flows\Attributes\Singleton;
 use Flows\Factory;
 use Flows\Processes\Process;
 use LogicException;
+use ReflectionClass;
 
 class ProcessRegistry
 {
@@ -20,21 +22,42 @@ class ProcessRegistry
      */
     public function add(Process|string $process): self
     {
-        if (is_string($process)) {
-            $process = Factory::getClassInstance($process);
+        if ($process instanceof Process) {
+            $reflection = new ReflectionClass($process);
+        } else {
+            if (
+                !class_exists($process)
+                || !is_subclass_of($process, Process::class)
+            ) {
+                // Fail early
+                throw new LogicException("Trying to register invalid process: {$process}");
+            }
+
+            $reflection = new ReflectionClass($process);
         }
 
-        $this->processes[get_class($process)] = $process;
+        $attrib = $reflection->getAttributes(Singleton::class);
+        $isSingleton = [] === $attrib
+            ? false
+            : $attrib[0]->newInstance()->getIsSingleton();
+        $className = $reflection->getName();
+        $this->processes[$className] = $isSingleton
+            ? ($process instanceof Process ? $process : Factory::getClassInstance($className))
+            : $className;
+
         return $this;
     }
 
     /**
      *
+     * Get the current process class name or instance 
+     * 
+     * @param bool $nameOrInstance TRUE => instance, FALSE => class name
      * @return Process
      */
-    public function getCurrentProcess(): Process
+    public function getCurrentProcess(bool $nameOrInstance = false): Process
     {
-        return $this->current;
+        return $nameOrInstance ? $this->current : get_class($this->current);
     }
 
     /**
@@ -45,8 +68,10 @@ class ProcessRegistry
      */
     public function getNamed(string $nsProcess): Process
     {
-        if ($this->exists($nsProcess)) {
-            return $this->current = $this->processes[$nsProcess];
+        if (isset($this->processes[$nsProcess])) {
+            return $this->current = $this->processes[$nsProcess] instanceof Process
+                ? $this->processes[$nsProcess] // Registered as a singleton
+                : Factory::getClassInstance($this->processes[$nsProcess]); // Not registered as a singleton
         }
 
         throw new LogicException("Unregistered process $nsProcess");
@@ -59,6 +84,6 @@ class ProcessRegistry
      */
     public function exists(string $nsProcess): bool
     {
-        return array_key_exists($nsProcess, $this->processes);
+        return isset($this->processes[$nsProcess]);
     }
 }

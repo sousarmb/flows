@@ -56,7 +56,10 @@ class ApplicationKernel
             }
             if ($gateOrReturn instanceof XorGate) {
                 $process->cleanUp();
-                $this->completedProcesses[] = get_class($process);
+                if (!static::isOffloadedProcess()) {
+                    // Only one process in offloaded processes, no need for extra work
+                    $this->completedProcesses[] = $process;
+                }
                 // Move to the next process
                 $this->stack->push([
                     $this->processes->getNamed($gateOrReturn()),
@@ -105,8 +108,11 @@ class ApplicationKernel
                     $end = true;
                 }
 
-                $this->completedProcesses[] = get_class($process);
                 $process->cleanUp();
+                if (!static::isOffloadedProcess()) {
+                    // Only one process in offloaded processes, no need for extra work
+                    $this->completedProcesses[] = $process;
+                }
             }
         } while (!$end);
 

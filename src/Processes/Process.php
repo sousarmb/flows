@@ -19,11 +19,6 @@ use LogicException;
 abstract class Process
 {
     protected array $tasks = [];
-    protected array $errors = [
-        'Invalid process',
-        'These tasks are done',
-        'Resume only after OrGate instance'
-    ];
     private ?EventKernel $events = null;
     private ?ObserverKernel $observers = null;
 
@@ -38,7 +33,10 @@ abstract class Process
         }
 
         foreach ($this->tasks as &$task) {
-            if (is_string($task)) {
+            if (
+                is_string($task)
+                && class_exists($task)
+            ) {
                 $task = Factory::getClassInstance($task, $task);
             }
             if (!$task instanceof Task && !$task instanceof Gate) {
@@ -59,12 +57,9 @@ abstract class Process
      */
     public function cleanUp(): void
     {
-        if ($this->observers) {
-            $this->events->handleDeferFromProcess();
-            $this->observers->observe($this);
-            $this->observers->handleDeferFromProcess();
-        }
-
+        $this->events?->handleDeferFromProcess();
+        $this->observers?->observe($this);
+        $this->observers?->handleDeferFromProcess();
         for ($i = count($this->tasks) - 1; $i >= 0; $i--) {
             $this->tasks[$i]->cleanUp();
         }
@@ -97,19 +92,23 @@ abstract class Process
     public function process(?IO $io = null): Gate|IO|null
     {
         if ($this->done()) {
-            throw new LogicException($this->errors[1]);
+            throw new LogicException('These tasks are done');
         }
 
         $current = reset($this->tasks);
         do {
             if ($current instanceof XorGate) {
+                // XorGate always ends the process
                 end($this->tasks);
                 $this->makeObservation($current->setIO($io));
                 return $current;
             } elseif ($current instanceof OrGate) {
                 $this->makeObservation($current->setIO($io));
+                // Always advance past OrGate - prevents infinite loop on first task
+                next($this->tasks);
                 return $current;
             } else {
+                // Regular task
                 $io = $current($io);
                 $this->makeObservation($io);
             }
@@ -126,13 +125,12 @@ abstract class Process
      */
     public function resume(?Collection $io = null): Gate|IO|null
     {
+        // Watch out! May be out of bounds!
         if ($this->done()) {
-            throw new LogicException($this->errors[1]);
-        } elseif (!(current($this->tasks) instanceof OrGate)) {
-            throw new LogicException($this->errors[2]);
+            throw new LogicException('These tasks are done');
         }
 
-        $current = next($this->tasks); // watch out: we may be out of bounds!
+        $current = current($this->tasks);
         do {
             if ($current instanceof XorGate) {
                 end($this->tasks);
@@ -140,6 +138,10 @@ abstract class Process
                 return $current;
             } elseif ($current instanceof OrGate) {
                 $this->makeObservation($current->setIO($io));
+                // Prevent infine loop when first task is a Or typed gate
+                // (array pointer must advance so application kernel selects "resume process" switch)
+                // (task key > 0)
+                next($this->tasks);
                 return $current;
             } elseif ($current) {
                 // ... but if not, process the task
@@ -153,8 +155,6 @@ abstract class Process
 
     private function makeObservation(object $subject): void
     {
-        if ($this->observers) {
-            $this->observers->observe($subject);
-        }
+        $this->observers?->observe($subject);
     }
 }
