@@ -55,10 +55,7 @@ class BootProcess extends Process
                     $packageName = InstalledVersions::getRootPackage()['name'];
                     $vendorDir = InstalledVersions::getInstallPath($packageName);
                     // Where is the code?
-                    $depth = InstalledVersions::getReference($packageName)
-                        ? 5 // application machine
-                        : 4; // development machine
-                    $root_dir = dirname($vendorDir, $depth) . '/';
+                    $root_dir = dirname($vendorDir, 4) . '/';
                     $application_dir = $root_dir . 'App/';
                     $config_dir = $application_dir . 'Config/';
                     $log_dir = $application_dir . 'Logs/';
