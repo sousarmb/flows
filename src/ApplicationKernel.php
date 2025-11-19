@@ -9,11 +9,13 @@ use Collectibles\Contracts\IO;
 use Flows\Container\Container;
 use Flows\Event\Kernel as EventKernel;
 use Flows\Facades\Config;
+use Flows\Facades\Logger;
 use Flows\Gates\OffloadOrGate;
 use Flows\Gates\OrGate;
 use Flows\Gates\XorGate;
 use Flows\Observer\Kernel as ObserverKernel;
 use Flows\Processes\Internal\BootProcess;
+use Flows\Processes\Internal\Events\ApplicationFullStop;
 use Flows\Processes\Internal\IO\OffloadedIO;
 use Flows\Processes\Internal\OffloadProcess;
 use Flows\Registries\ProcessRegistry;
@@ -28,6 +30,7 @@ class ApplicationKernel
     private ObserverKernel $observers;
     private array $completedProcesses = [];
     private SplStack $stack;
+    private static bool $fullStop;
 
     private function flow(): ?IO
     {
@@ -38,6 +41,16 @@ class ApplicationKernel
         }
 
         do {
+            if (isset(static::$fullStop)) {
+                $nsProcess = get_class($process);
+                $taskKey = $process->getCurrentTaskKey();
+                $this->events->handle(
+                    new ApplicationFullStop($nsProcess, $taskKey)
+                );
+                Logger::info("Full stop called {$nsProcess} task key {$taskKey}");
+                return null;
+            }
+
             [$process, $io, $source] = $this->stack->pop();
             $taskKey = $process->getCurrentTaskKey();
             if (0 === $taskKey) {
@@ -101,7 +114,7 @@ class ApplicationKernel
                 if ($source) {
                     $collection->add(
                         $gateOrReturn,
-                        get_class($source)
+                        get_class($source) . '.' . get_class($process)
                     );
                 } else {
                     // No gate, nowhere to go, end the flow
@@ -119,6 +132,14 @@ class ApplicationKernel
         return $gateOrReturn;
     }
 
+    /**
+     * 
+     * Process the flow
+     * 
+     * @param string $nsInitialProcess Start with this process
+     * @param ?IO $io Give it this input
+     * @return IO|null
+     */
     public function process(
         string $nsInitialProcess,
         ?IO $io = null
@@ -180,12 +201,21 @@ class ApplicationKernel
 
     /**
      * 
-     * Current process is offloaded?
+     * Running process outside of main process (offloaded)?
      * 
      * @return bool TRUE if process is offloaded, FALSE otherwise
      */
     public static function isOffloadedProcess(): bool
     {
         return defined('OFFLOADED_PROCESS');
+    }
+
+    /**
+     * 
+     * Stop all work on next iteration
+     */
+    public static function fullStop(): void
+    {
+        static::$fullStop = true;
     }
 }

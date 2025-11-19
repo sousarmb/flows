@@ -22,7 +22,12 @@ class Reactor
 
     public function remove($stream): void
     {
-        unset($this->readHandlers[(int)$stream], $this->writeHandlers[(int)$stream]);
+        if (isset($this->readHandlers[(int)$stream])) {
+            unset($this->readHandlers[(int)$stream]);
+        }
+        if (isset($this->writeHandlers[(int)$stream])) {
+            unset($this->writeHandlers[(int)$stream]);
+        }
     }
 
     public function addTimer(float $interval, callable $callback, bool $repeat = false): void
@@ -43,7 +48,7 @@ class Reactor
                 }
             }
         }
-        // reindex
+        // Re-index
         $this->timers = array_values($this->timers);
     }
 
@@ -51,7 +56,7 @@ class Reactor
     {
         while (!empty($this->readHandlers) || !empty($this->writeHandlers) || !empty($this->timers)) {
             $timeout = null;
-            // compute next timer deadline
+            // Compute next timer deadline
             if (!empty($this->timers)) {
                 $nextDue = min(array_column($this->timers, 0));
                 $timeout = max(0, $nextDue - microtime(true));
@@ -60,16 +65,16 @@ class Reactor
             $read = array_column($this->readHandlers, 0);
             $write = array_column($this->writeHandlers, 0);
             $except = null;
-            // wait for streams or timer expiry
+            // Wait for streams or timer expiry
             if ($read || $write) {
                 stream_select($read, $write, $except, $timeout === null ? null : (int)$timeout, $timeout !== null ? (int)(($timeout - (int)$timeout) * 1e6) : 0);
             } else {
-                // no streams, just sleep until next timer
+                // No streams, just sleep until next timer
                 if ($timeout !== null) {
                     usleep((int)($timeout * 1e6));
                 }
             }
-            // handle I/O
+            // Handle I/O
             foreach ($read as $r) {
                 [$stream, $handler] = $this->readHandlers[(int)$r];
                 $handler($stream, $this);
@@ -78,7 +83,7 @@ class Reactor
                 [$stream, $handler] = $this->writeHandlers[(int)$w];
                 $handler($stream, $this);
             }
-            // handle timers
+            // Handle timers
             $this->runTimers();
         }
     }
