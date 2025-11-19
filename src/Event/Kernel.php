@@ -5,21 +5,25 @@ declare(strict_types=1);
 namespace Flows\Event;
 
 use Collectibles\Collection;
+use Flows\ApplicationKernel;
 use Flows\Attributes\Defer\DeferFromFlow;
 use Flows\Attributes\Defer\DeferFromProcess;
 use Flows\Attributes\Realtime;
 use Flows\Contracts\EventHandler;
+use Flows\Facades\Config;
+use Flows\Facades\Logger;
 use Flows\Factory;
 use LogicException;
 
 class Kernel implements EventHandler
 {
+    private bool $defaultStopOnNoEventHandler = false;
+
     public function __construct(
         private Collection $registry = new Collection(),
         private Collection $deferFromFlow = new Collection(),
         private Collection $deferFromProcess = new Collection()
-    ) {
-    }
+    ) {}
 
     /**
      *
@@ -49,7 +53,12 @@ class Kernel implements EventHandler
     {
         $nsEvent = get_class($event);
         if (!$this->registry->has($nsEvent)) {
-            throw new LogicException("No handler defined for event $nsEvent");
+            Logger::warning("No handler defined for event {$nsEvent}");
+            if (Config::getApplicationSettings()->get('stop.on_no_event_handler', $this->defaultStopOnNoEventHandler)) {
+                // Stop the kernel from running other processes
+                ApplicationKernel::fullStop();
+            }
+            return;
         }
 
         list($nsHandler, $timing) = $this->registry->get($nsEvent);

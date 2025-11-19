@@ -8,6 +8,7 @@ use Collectibles\Collection;
 use Collectibles\Contracts\IO;
 use Composer\InstalledVersions;
 use Exception;
+use Flows\ApplicationKernel;
 use Flows\Attributes\Defer\DeferFromFlow;
 use Flows\Attributes\Defer\DeferFromProcess;
 use Flows\Attributes\Lazy;
@@ -26,6 +27,7 @@ use Flows\Facades\Events as EventFacade;
 use Flows\Facades\Logger as LoggerFacade;
 use Flows\Facades\Observers as ObserverFacade;
 use Flows\Factory;
+use Flows\Helpers\StdErrMonologHandler;
 use Flows\Observer\Kernel as ObserverKernel;
 use Flows\Processes\Process;
 use LogicException;
@@ -84,7 +86,15 @@ class BootProcess extends Process
                 {
                     $config = $io->get(Config::class);
                     $logger = new Logger('debug');
-                    $handler = new StreamHandler($config->get('app.log.directory') . 'debug.log', Level::Debug);
+                    if (ApplicationKernel::isOffloadedProcess()) {
+                        $stream = $config->get('app.log.directory') . str_replace('\\', '-', OFFLOADED_PROCESS_NAME) . '.log';
+                        // Notify main process as well
+                        $logger->pushHandler(new StdErrMonologHandler(Level::Error));
+                    } else {
+                        $stream = $config->get('app.log.directory') . 'debug.log';
+                    }
+
+                    $handler = new StreamHandler($stream, Level::Debug);
                     $handler->setFormatter(new LineFormatter(includeStacktraces: true));
                     $logger->pushHandler($handler);
                     ErrorHandler::register($logger);

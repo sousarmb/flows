@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Flows\Processes\Internal;
 
+use Collectibles\Collection;
 use Collectibles\Contracts\IO;
+use Flows\ApplicationKernel;
 use Flows\Contracts\Tasks\Task;
 use Flows\Facades\Config;
+use Flows\Facades\Events;
 use Flows\Facades\Logger;
+use Flows\Processes\Internal\Events\OffloadedProcessError;
 use Flows\Processes\Internal\IO\OffloadedIO;
 use Flows\Processes\Process;
 use Flows\Reactor\Reactor;
@@ -53,6 +57,7 @@ class OffloadProcess extends Process
                         );
                         stream_set_blocking($pipes[0], false);
                         stream_set_blocking($pipes[1], false);
+                        stream_set_blocking($pipes[2], false);
                         // store process data for further use
                         $processes[$processName] = [$process, $pipes[0], $pipes[1], $pipes[2]];
                     }
@@ -65,26 +70,40 @@ class OffloadProcess extends Process
                 use OffloadedProcess;
 
                 private array $processes;
+                private bool $default_stop_on_offload_error = true;
                 public function __invoke(?IO $io = null): ?IO
                 {
                     $this->processes = $io->get('processes');
+                    $output = new Collection();
                     $reactor = new Reactor();
-                    // wait / read process output
+                    // Wait/read process output
                     foreach ($io->get('processes') as $processName => [$process, $stdin, $stdout, $stderr]) {
-                        $reactor->onReadable($stderr, function ($stream, $reactor) use ($processName, $io) {
-                            // get process error data
-                            $tmp = fgets($stream);
-                            if (false === $tmp) return;
-                            $data = '';
-                            do {
-                                $data .= $tmp;
-                                $tmp = fgets($stream);
-                            } while ($tmp);
-                            Logger::alert($data, [$processName, base64_encode(serialize($io))]);
-                            $reactor->remove($stream);
+                        $reactor->onReadable($stderr, function ($stream, $reactor) use ($io, $stdout, $processName) {
+                            // Get process error data
+                            $data = fgets($stream);
+                            if ($data === $io->get('contentTerminator') . PHP_EOL) {
+                                // Remove pipes to prevent infinite loop
+                                $reactor->remove($stdout);
+                                $reactor->remove($stream);
+                                // Throw event, developer has to write a handler to it
+                                Events::handle(
+                                    new OffloadedProcessError($processName, $io)
+                                );
+                                if (Config::getApplicationSettings()->get('stop.on_offload_error', $this->default_stop_on_offload_error)) {
+                                    // Stop reactor 
+                                    // Other offloaded processes continue running for a while!
+                                    $reactor->stopRun();
+                                    // Stop the kernel from running other processes
+                                    ApplicationKernel::fullStop();
+                                }
+                            } elseif ($data) {
+                                Logger::alert('Unexpected output from offloaded process', [$data]);
+                            } elseif (!$data) {
+                                $reactor->remove($stream);
+                            }
                         });
                         $reactor->onWritable($stdin, function ($stream, $reactor) use ($processName, $io) {
-                            // send work to command
+                            // Send work to command
                             $message = sprintf(
                                 '%s|%s|%s|%s' . PHP_EOL,
                                 $processName,
@@ -95,21 +114,21 @@ class OffloadProcess extends Process
                             if (!fwrite($stream, $message)) {
                                 throw new RuntimeException("Could not pipe process setup to child process $processName");
                             }
-                            // setup piped, one less stream to write to
+                            // Setup piped, one less stream to write to
                             $reactor->remove($stream);
                         });
-                        $reactor->onReadable($stdout, function ($stream, $reactor) use ($processName, $io) {
-                            // get process data
+                        $reactor->onReadable($stdout, function ($stream, $reactor) use ($processName, $io, $output) {
+                            // Get process data
                             $data = fgets($stream);
                             if ($data === $io->get('contentTerminator') . PHP_EOL) {
                                 // return stored, one less stream to listen to
                                 $reactor->remove($stream);
                             } elseif ($data !== false) {
                                 // store process output in the "processIO" collection
-                                $io->get('processIO')->set(unserialize(base64_decode($data)), $processName);
+                                $output->set(unserialize(base64_decode($data)), $processName);
                             }
                         });
-                        // when all processes done, loop terminates itself
+                        // When all processes done, loop terminates itself
                         // check max_execution_time to force process termination
                         $maxExecutionTime = ini_get('max_execution_time');
                         if ($maxExecutionTime > 0) {
@@ -134,19 +153,13 @@ class OffloadProcess extends Process
                         }
                     }
                     $reactor->run();
-                    return $io->get('processIO');
+                    return $output;
                 }
 
                 public function cleanUp(): void
                 {
-                    foreach ($this->processes as $processName => [$process, $stdin, $stdout, $stderr]) {
-                        // stop, remove process
-                        // $message = sprintf(
-                        //     'Terminate and close offloaded process - #%s %s',
-                        //     (int)$process,
-                        //     $processName
-                        // );
-                        // trigger_error($message, E_USER_NOTICE);
+                    foreach ($this->processes as $nsProcess => [$process, $stdin, $stdout, $stderr]) {
+                        // Always signal to terminate and close process resources 
                         $this->terminateProcess($process);
                         $this->closeProcess($process);
                     }
