@@ -59,13 +59,13 @@ class CreateAndWriteToFileProcess extends Process
     }
 }
 
-final class CreateAndWriteToFileProcessTest extends TestCase
+class ProcessTest extends TestCase
 {
     /**
      * @covers \App\Processes\CreateAndWriteToFileProcess::__construct
      * @covers \Flows\Processes\Process::__construct
      */
-    public function test_constructor_sets_three_tasks(): void
+    public function testConstructorSetsThreeTasks(): void
     {
         $process = new CreateAndWriteToFileProcess();
 
@@ -83,7 +83,7 @@ final class CreateAndWriteToFileProcessTest extends TestCase
      * @covers \Flows\Processes\Process::run
      * @covers \Flows\Processes\Process::cleanUp
      */
-    public function test_process_executes_all_tasks_creates_file_and_cleans_up(): void
+    public function testProcessExecutesAllTasksCreatesFileAndCleansUp(): void
     {
         $process = new CreateAndWriteToFileProcess();
         $result = $process->process();
@@ -111,7 +111,7 @@ final class CreateAndWriteToFileProcessTest extends TestCase
     /**
      * @covers \Flows\Processes\Process::run
      */
-    public function test_process_works_with_null_io(): void
+    public function testProcessWorksWithNullIo(): void
     {
         $process = new CreateAndWriteToFileProcess();
 
