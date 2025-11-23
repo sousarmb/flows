@@ -19,11 +19,17 @@ class XorGatedProcessTest extends TestCase
         $this->tempFile = sys_get_temp_dir() . DIRECTORY_SEPARATOR . 'dummy';
     }
 
+    protected function tearDown(): void
+    {
+        unlink($this->tempFile);
+        parent::tearDown();
+    }
+
     /**
      * @covers \CreateAndWriteToFileProcess::__construct
      * @covers \CreateAndWriteToFileProcess::run
      */
-    public function testProcessCreatesFileWritesContentAndReturnsOneOfTheRandomProcesses(): void
+    public function testProcessCreatesFileWritesContentAndReturnsXorGate(): void
     {
         $process = new class extends Process {
             public function __construct()
@@ -78,8 +84,5 @@ class XorGatedProcessTest extends TestCase
 
         self::assertInstanceOf(Gate::class, $result);
         self::assertEquals('SomeRandomProcess', $result());
-
-        // Cleanup
-        unlink($this->tempFile);
     }
 }
