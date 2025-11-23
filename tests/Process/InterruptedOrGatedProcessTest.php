@@ -6,11 +6,11 @@ use Collectibles\Collection;
 use Collectibles\Contracts\IO;
 use Flows\Contracts\Gate;
 use Flows\Contracts\Tasks\Task;
-use Flows\Gates\XorGate;
+use Flows\Gates\OrGate;
 use Flows\Processes\Process;
 use PHPUnit\Framework\TestCase;
 
-class InterruptedXorGatedProcessTest extends TestCase
+class InterruptedOrGatedProcessTest extends TestCase
 {
     private string $tempFile;
 
@@ -29,7 +29,7 @@ class InterruptedXorGatedProcessTest extends TestCase
      * @covers \CreateAndWriteToFileProcess::__construct
      * @covers \CreateAndWriteToFileProcess::run
      */
-    public function testProcessCreatesFileWritesContentAndReturnsProcesseName(): void
+    public function testProcessCreatesFileWritesContentAndReturnsArrayOfProcessNames(): void
     {
         $process = new class extends Process {
             public function __construct()
@@ -56,10 +56,10 @@ class InterruptedXorGatedProcessTest extends TestCase
                             fclose($this->coll->get('fileHandle'));
                         }
                     },
-                    new class extends XorGate {
-                        public function __invoke(): string
+                    new class extends OrGate {
+                        public function __invoke(): array
                         {
-                            return 'SomeRandomProcess';
+                            return ['SomeRandomProcessA', 'SomeRandomProcessB'];
                         }
                     },
                     new class implements Task {
@@ -80,6 +80,6 @@ class InterruptedXorGatedProcessTest extends TestCase
 
         self::assertFileExists($this->tempFile);
         self::assertInstanceOf(Gate::class, $result);
-        self::assertEquals('SomeRandomProcess', $result());
+        self::assertEquals(['SomeRandomProcessA', 'SomeRandomProcessB'], $result());
     }
 }
