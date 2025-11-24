@@ -9,13 +9,12 @@ use Flows\ApplicationKernel;
 use Flows\Attributes\Defer\DeferFromFlow;
 use Flows\Attributes\Defer\DeferFromProcess;
 use Flows\Attributes\Realtime;
-use Flows\Contracts\EventHandler;
+use Flows\Contracts\EventHandler as EventHandlerContract;
 use Flows\Facades\Config;
 use Flows\Facades\Logger;
 use Flows\Factory;
-use LogicException;
 
-class Kernel implements EventHandler
+class Kernel implements EventHandlerContract
 {
     private bool $defaultStopOnNoEventHandler = false;
 

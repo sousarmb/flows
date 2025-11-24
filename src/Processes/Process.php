@@ -6,8 +6,9 @@ namespace Flows\Processes;
 
 use Collectibles\Collection;
 use Collectibles\Contracts\IO;
-use Flows\Contracts\Gate;
-use Flows\Contracts\Tasks\Task;
+use Flows\Contracts\Gate as GateContract;
+use Flows\Contracts\Tasks\CleanUp as CleanUpContract;
+use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Event\Kernel as EventKernel;
 use Flows\Facades\Container;
 use Flows\Factory;
@@ -16,8 +17,10 @@ use Flows\Gates\XorGate;
 use Flows\Observer\Kernel as ObserverKernel;
 use LogicException;
 
-abstract class Process
+abstract class Process implements CleanUpContract
 {
+    private int $position = 0;
+    private int $taskCount = 0;
     protected array $tasks = [];
     private ?EventKernel $events = null;
     private ?ObserverKernel $observers = null;
@@ -39,13 +42,17 @@ abstract class Process
             ) {
                 $task = Factory::getClassInstance($task, $task);
             }
-            if (!$task instanceof Task && !$task instanceof Gate) {
-                throw new LogicException('Invalid task: must be instance of Task or Gate classes');
+            if (
+                !$task instanceof TaskContract
+                && !$task instanceof GateContract
+            ) {
+                throw new LogicException('Invalid task: must be instance of Task or Gate contract');
             }
         }
-        // Is flows booting?
+
+        $this->taskCount = count($this->tasks);
+        // Bind kernels if container is ready
         if (Container::isReady()) {
-            // no, already booted
             $this->events = Container::get(EventKernel::class);
             $this->observers = Container::get(ObserverKernel::class);
         }
@@ -53,15 +60,18 @@ abstract class Process
 
     /**
      *
+     * Run task cleanup, last to first (includes tasks not processed)
+     * 
      * @return void
      */
-    public function cleanUp(): void
+    public function cleanUp(bool $forSerialization = false): void
     {
         $this->events?->handleDeferFromProcess();
         $this->observers?->observe($this);
         $this->observers?->handleDeferFromProcess();
-        for ($i = count($this->tasks) - 1; $i >= 0; $i--) {
-            $this->tasks[$i]->cleanUp();
+        for ($i = $this->taskCount - 1; $i >= 0; $i--) {
+            // Propagate signal to tasks
+            $this->tasks[$i]->cleanUp($forSerialization);
         }
     }
 
@@ -71,90 +81,123 @@ abstract class Process
      */
     public function done(): bool
     {
-        return key($this->tasks) === null;
+        return $this->position >= $this->taskCount;
     }
 
     /**
      *
-     * @return int|null
+     * @return int|null  Null when process is done, tasks position otherwise
      */
-    public function getCurrentTaskKey(): ?int
+    public function getPosition(): ?int
     {
-        return key($this->tasks);
+        return $this->done()
+            ? null
+            : $this->position;
+    }
+
+    /**
+     * 
+     * @return array<int|null, int> Where 0 => current task index or null if 
+     *                              process completed, 1 => task count
+     */
+    public function getProgress(): array
+    {
+        return [$this->position, $this->taskCount];
     }
 
     /**
      *
      * @param IO|null $io
-     * @return Gate|IO|null
+     * @return GateContract|IO|null
      * @throws LogicException
      */
-    public function process(?IO $io = null): Gate|IO|null
+    private function handle(?IO $io = null): GateContract|IO|null
     {
-        if ($this->done()) {
-            throw new LogicException('These tasks are done');
-        }
-
-        $current = reset($this->tasks);
         do {
-            if ($current instanceof XorGate) {
+            $work = $this->tasks[$this->position];
+            if ($work instanceof XorGate) {
+                $this->makeObservation($work->setIO($io));
                 // XorGate always ends the process
-                end($this->tasks);
-                $this->makeObservation($current->setIO($io));
-                return $current;
-            } elseif ($current instanceof OrGate) {
-                $this->makeObservation($current->setIO($io));
-                // Always advance past OrGate - prevents infinite loop on first task
-                next($this->tasks);
-                return $current;
+                $this->position = $this->taskCount;
+                return $work;
+            } elseif ($work instanceof OrGate) {
+                $this->makeObservation($work->setIO($io));
+                // Always advance past OrGate (prevents infinite loop on first task)
+                $this->position++;
+                return $work;
             } else {
-                // Regular task
-                $io = $current($io);
+                // Regular task, do the work
+                $io = $work($io);
                 $this->makeObservation($io);
+                $this->position++;
             }
-        } while ($current = next($this->tasks));
-
+        } while ($this->position < $this->taskCount);
         return $io;
     }
 
     /**
+     * 
+     * Start from first task
      *
      * @param Collection|null $io
-     * @return Gate|IO|null
+     * @return GateContract|IO|null
      * @throws LogicException
      */
-    public function resume(?Collection $io = null): Gate|IO|null
+    public function run(?IO $io = null): GateContract|IO|null
     {
-        // Watch out! May be out of bounds!
         if ($this->done()) {
-            throw new LogicException('These tasks are done');
+            throw new LogicException('Process already completed');
         }
 
-        $current = current($this->tasks);
-        do {
-            if ($current instanceof XorGate) {
-                end($this->tasks);
-                $this->makeObservation($current->setIO($io));
-                return $current;
-            } elseif ($current instanceof OrGate) {
-                $this->makeObservation($current->setIO($io));
-                // Prevent infine loop when first task is a Or typed gate
-                // (array pointer must advance so application kernel selects "resume process" switch)
-                // (task key > 0)
-                next($this->tasks);
-                return $current;
-            } elseif ($current) {
-                // ... but if not, process the task
-                $io = $current($io);
-                $this->makeObservation($io);
-            }
-        } while ($current = next($this->tasks));
+        $this->position = 0;
+        return $this->handle($io);
+    }
 
-        return $io;
+    /**
+     *
+     * Resume where left
+     * 
+     * @param IO|null $io
+     * @return GateContract|IO|null
+     * @throws LogicException
+     */
+    public function resume(?IO $io = null): GateContract|IO|null
+    {
+        if ($this->done()) {
+            throw new LogicException('Process already completed');
+        }
+
+        return $this->handle($io);
     }
 
     private function makeObservation(object $subject): void
     {
         $this->observers?->observe($subject);
+    }
+
+    /**
+     * 
+     * Prepare process and tasks for serialization. 
+     * Serialize position, task count and tasks members.
+     * 
+     * @return array<int, string> 
+     */
+    public function __sleep(): array
+    {
+        $this->cleanUp(true);
+        return ['position', 'taskCount', 'tasks'];
+    }
+
+    /**
+     * 
+     * Re-bind event and observer kernel if container ready.
+     */
+    public function __wakeup(): void
+    {
+        // Re-bind kernels if container is ready
+        if (Container::isReady()) {
+            $this->events = Container::get(EventKernel::class);
+            $this->observers = Container::get(ObserverKernel::class);
+        }
     }
 }

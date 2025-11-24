@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Flows\Gates;
 
 use Collectibles\Contracts\IO;
-use Flows\Contracts\Gate as iGate;
+use Flows\Contracts\Gate as GateContract;
+use Flows\Contracts\Tasks\CleanUp as CleanUpContract;
 
-abstract class Gate implements iGate
+abstract class Gate implements GateContract, CleanUpContract
 {
     protected ?IO $io;
 
@@ -32,10 +33,11 @@ abstract class Gate implements iGate
     }
 
     /**
-     *
-     * @return void
+     * 
+     * @return array<int, mixed>
      */
-    public function cleanUp(): void
+    public function __sleep(): array
     {
+        return ['io'];
     }
 }

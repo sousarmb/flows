@@ -31,7 +31,7 @@ class CreateAndWriteToFileProcess extends Process
                     return $this->coll;
                 }
 
-                public function cleanUp(): void
+                public function cleanUp(bool $forSerialization = false): void
                 {
                     fclose($this->coll->get('fileHandle'));
                 }
@@ -43,7 +43,7 @@ class CreateAndWriteToFileProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -52,7 +52,7 @@ class CreateAndWriteToFileProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             }
         ];
         parent::__construct();
@@ -86,7 +86,7 @@ class ProcessTest extends TestCase
     public function testProcessExecutesAllTasksCreatesFileAndCleansUp(): void
     {
         $process = new CreateAndWriteToFileProcess();
-        $result = $process->process();
+        $result = $process->run();
 
         $this->assertInstanceOf(Collection::class, $result);
         $this->assertInstanceOf(IO::class, $result);
@@ -115,7 +115,7 @@ class ProcessTest extends TestCase
     {
         $process = new CreateAndWriteToFileProcess();
 
-        $result = $process->process(null);
+        $result = $process->run(null);
 
         $this->assertInstanceOf(Collection::class, $result);
         $this->assertInstanceOf(IO::class, $result);

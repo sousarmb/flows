@@ -43,19 +43,19 @@ class ApplicationKernel
         do {
             if (isset(static::$fullStop)) {
                 $nsProcess = get_class($process);
-                $taskKey = $process->getCurrentTaskKey();
+                $nTask = $process->getPosition();
                 $this->events->handle(
-                    new ApplicationFullStop($nsProcess, $taskKey)
+                    new ApplicationFullStop($nsProcess, $nTask)
                 );
-                Logger::info("Full stop called {$nsProcess} task key {$taskKey}");
+                Logger::info("Full stop called on {$nsProcess} at task {$nTask}");
                 return null;
             }
 
             [$process, $io, $source] = $this->stack->pop();
-            $taskKey = $process->getCurrentTaskKey();
-            if (0 === $taskKey) {
+            $nTask = $process->getPosition();
+            if (0 === $nTask) {
                 // process from new
-                $gateOrReturn = $process->process($io);
+                $gateOrReturn = $process->run($io);
             } else {
                 // resume process
                 $nsProcess = get_class($process);
@@ -87,7 +87,7 @@ class ApplicationKernel
                     throw new LogicException('Empty return from gate ' . get_class($gateOrReturn));
                 }
                 $offloadProcess = new OffloadProcess();
-                $processesReturn = $offloadProcess->process(
+                $processesReturn = $offloadProcess->run(
                     new OffloadedIO($offloadOrProcesses, $gateOrReturn->getIO())
                 );
                 $offloadProcess->cleanUp();

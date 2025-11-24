@@ -20,7 +20,7 @@ class DummyTask implements Task
         return $io;
     }
 
-    public function cleanUp(): void
+    public function cleanUp(bool $forSerialization = false): void
     {
         if (isset($this->coll)) {
             $this->coll->delete('item');

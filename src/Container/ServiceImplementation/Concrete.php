@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Flows\Container\ServiceImplementation;
 
-use Flows\Contracts\Container\Entry;
+use Flows\Contracts\Container\Entry as EntryContract;
 
-class Concrete implements Entry
+class Concrete implements EntryContract
 {
     public function __construct(
         protected string $nsClass,

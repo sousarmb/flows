@@ -8,10 +8,10 @@ use Collectibles\Collection;
 use Flows\Attributes\Defer\DeferFromFlow;
 use Flows\Attributes\Defer\DeferFromProcess;
 use Flows\Attributes\Realtime;
-use Flows\Contracts\Observer;
+use Flows\Contracts\Observer as ObserverContract;
 use Flows\Factory;
 
-class Kernel implements Observer
+class Kernel implements ObserverContract
 {
     public function __construct(
         private Collection $registry = new Collection(),

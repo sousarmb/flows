@@ -45,7 +45,7 @@ class OrGatedProcessTest extends TestCase
                             return $this->coll;
                         }
 
-                        public function cleanUp(): void
+                        public function cleanUp(bool $forSerialization = false): void
                         {
                             fclose($this->coll->get('fileHandle'));
                         }
@@ -57,20 +57,22 @@ class OrGatedProcessTest extends TestCase
                             return $io;
                         }
 
-                        public function cleanUp(): void {}
+                        public function cleanUp(bool $forSerialization = false): void {}
                     },
                     new class extends OrGate {
                         public function __invoke(): array
                         {
                             return ['SomeRandomProcessA', 'SomeRandomProcessB'];
                         }
+
+                        public function cleanUp(bool $forSerialization = false): void {}
                     }
                 ];
                 parent::__construct();
             }
         };
 
-        $result = $process->process();
+        $result = $process->run();
 
         self::assertFileExists($this->tempFile);
         $content = file_get_contents($this->tempFile);
