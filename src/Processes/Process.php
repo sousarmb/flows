@@ -7,6 +7,7 @@ namespace Flows\Processes;
 use Collectibles\Collection;
 use Collectibles\Contracts\IO;
 use Flows\Contracts\Gate;
+use Flows\Contracts\Tasks\CleanUp;
 use Flows\Contracts\Tasks\Task;
 use Flows\Event\Kernel as EventKernel;
 use Flows\Facades\Container;
@@ -16,12 +17,8 @@ use Flows\Gates\XorGate;
 use Flows\Observer\Kernel as ObserverKernel;
 use LogicException;
 
-abstract class Process
+abstract class Process implements CleanUp
 {
-    /**
-     * @var Flag TRUE when serialize called on this object, FALSE after waking up
-     */
-    private bool $serialize = false;
     private int $position = 0;
     private int $taskCount = 0;
     protected array $tasks = [];
@@ -67,13 +64,14 @@ abstract class Process
      * 
      * @return void
      */
-    public function cleanUp(): void
+    public function cleanUp(bool $forSerialization = false): void
     {
         $this->events?->handleDeferFromProcess();
         $this->observers?->observe($this);
         $this->observers?->handleDeferFromProcess();
         for ($i = $this->taskCount - 1; $i >= 0; $i--) {
-            $this->tasks[$i]->cleanUp();
+            // Propagate signal to tasks
+            $this->tasks[$i]->cleanUp($forSerialization);
         }
     }
 
@@ -177,16 +175,25 @@ abstract class Process
         $this->observers?->observe($subject);
     }
 
+    /**
+     * 
+     * Prepare process and tasks for serialization. 
+     * Serialize position, task count and tasks members.
+     * 
+     * @return array<int, string> 
+     */
     public function __sleep(): array
     {
-        $this->serialize = true;
-        $this->cleanUp();
+        $this->cleanUp(true);
         return ['position', 'taskCount', 'tasks'];
     }
 
+    /**
+     * 
+     * Re-bind event and observer kernel if container ready.
+     */
     public function __wakeup(): void
     {
-        $this->serialize = false;
         // Re-bind kernels if container is ready
         if (Container::isReady()) {
             $this->events = Container::get(EventKernel::class);

@@ -37,7 +37,7 @@ class OffloadProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -64,7 +64,7 @@ class OffloadProcess extends Process
                     return new OffloadedIO($processes, $io->get('processIO'), $io->get('contentTerminator'));
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements Task {
                 use OffloadedProcess;
@@ -156,7 +156,7 @@ class OffloadProcess extends Process
                     return $output;
                 }
 
-                public function cleanUp(): void
+                public function cleanUp(bool $forSerialization = false): void
                 {
                     foreach ($this->processes as $nsProcess => [$process, $stdin, $stdout, $stderr]) {
                         // Always signal to terminate and close process resources 

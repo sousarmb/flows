@@ -49,7 +49,7 @@ class BootProcess extends Process
                     return new Collection();
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -79,7 +79,7 @@ class BootProcess extends Process
                     );
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -104,7 +104,7 @@ class BootProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -122,7 +122,7 @@ class BootProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -146,7 +146,7 @@ class BootProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -213,7 +213,7 @@ class BootProcess extends Process
                     return $io->set($container, Container::class);
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -260,7 +260,7 @@ class BootProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -307,7 +307,7 @@ class BootProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): IO
@@ -322,7 +322,7 @@ class BootProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             }
         ];
         parent::__construct();

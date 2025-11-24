@@ -6,8 +6,9 @@ namespace Flows\Gates;
 
 use Collectibles\Contracts\IO;
 use Flows\Contracts\Gate as GateContract;
+use Flows\Contracts\Tasks\CleanUp as CleanUpContract;
 
-abstract class Gate implements GateContract
+abstract class Gate implements GateContract, CleanUpContract
 {
     protected ?IO $io;
 
@@ -30,12 +31,6 @@ abstract class Gate implements GateContract
     {
         return $this->io;
     }
-
-    /**
-     *
-     * @return void
-     */
-    public function cleanUp(): void {}
 
     /**
      * 
