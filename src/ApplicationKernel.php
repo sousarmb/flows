@@ -55,7 +55,7 @@ class ApplicationKernel
             $nTask = $process->getPosition();
             if (0 === $nTask) {
                 // process from new
-                $gateOrReturn = $process->process($io);
+                $gateOrReturn = $process->run($io);
             } else {
                 // resume process
                 $nsProcess = get_class($process);
@@ -87,7 +87,7 @@ class ApplicationKernel
                     throw new LogicException('Empty return from gate ' . get_class($gateOrReturn));
                 }
                 $offloadProcess = new OffloadProcess();
-                $processesReturn = $offloadProcess->process(
+                $processesReturn = $offloadProcess->run(
                     new OffloadedIO($offloadOrProcesses, $gateOrReturn->getIO())
                 );
                 $offloadProcess->cleanUp();

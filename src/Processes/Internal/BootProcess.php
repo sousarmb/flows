@@ -18,9 +18,9 @@ use Flows\Config;
 use Flows\Container\Container;
 use Flows\Container\ServiceImplementation\Abstraction;
 use Flows\Container\ServiceImplementation\Concrete;
-use Flows\Contracts\EventHandler;
-use Flows\Contracts\Observer;
-use Flows\Contracts\Tasks\Task;
+use Flows\Contracts\EventHandler as EventHandlerContract;
+use Flows\Contracts\Observer as ObserverContract;
+use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Event\Kernel as EventKernel;
 use Flows\Facades\Config as ConfigFacade;
 use Flows\Facades\Events as EventFacade;
@@ -43,7 +43,7 @@ class BootProcess extends Process
     public function __construct()
     {
         $this->tasks = [
-            new class implements Task {
+            new class implements TaskContract {
                 public function __invoke(?IO $io = null): ?IO
                 {
                     return new Collection();
@@ -51,7 +51,7 @@ class BootProcess extends Process
 
                 public function cleanUp(bool $forSerialization = false): void {}
             },
-            new class implements Task {
+            new class implements TaskContract {
                 public function __invoke(?IO $io = null): ?IO
                 {
                     $packageName = InstalledVersions::getRootPackage()['name'];
@@ -81,7 +81,7 @@ class BootProcess extends Process
 
                 public function cleanUp(bool $forSerialization = false): void {}
             },
-            new class implements Task {
+            new class implements TaskContract {
                 public function __invoke(?IO $io = null): ?IO
                 {
                     $config = $io->get(Config::class);
@@ -106,7 +106,7 @@ class BootProcess extends Process
 
                 public function cleanUp(bool $forSerialization = false): void {}
             },
-            new class implements Task {
+            new class implements TaskContract {
                 public function __invoke(?IO $io = null): ?IO
                 {
                     $config = $io->get(Config::class);
@@ -124,7 +124,7 @@ class BootProcess extends Process
 
                 public function cleanUp(bool $forSerialization = false): void {}
             },
-            new class implements Task {
+            new class implements TaskContract {
                 public function __invoke(?IO $io = null): ?IO
                 {
                     $config = $io->get(Config::class);
@@ -148,7 +148,7 @@ class BootProcess extends Process
 
                 public function cleanUp(bool $forSerialization = false): void {}
             },
-            new class implements Task {
+            new class implements TaskContract {
                 public function __invoke(?IO $io = null): ?IO
                 {
                     $config = $io->get(Config::class);
@@ -215,7 +215,7 @@ class BootProcess extends Process
 
                 public function cleanUp(bool $forSerialization = false): void {}
             },
-            new class implements Task {
+            new class implements TaskContract {
                 public function __invoke(?IO $io = null): ?IO
                 {
                     $config = $io->get(Config::class);
@@ -228,8 +228,8 @@ class BootProcess extends Process
                     $eventKernel = Factory::getClassInstance(EventKernel::class);
                     foreach ($settings as $nsEvent => $nsHandler) {
                         $reflection = new ReflectionClass($nsHandler);
-                        if (!$reflection->implementsInterface(EventHandler::class)) {
-                            throw new LogicException('Event handlers must implement ' . EventHandler::class . 'interface');
+                        if (!$reflection->implementsInterface(EventHandlerContract::class)) {
+                            throw new LogicException('Event handlers must implement ' . EventHandlerContract::class . 'interface');
                         }
 
                         $timing = $reflection->getAttributes(DeferFromFlow::class)
@@ -262,7 +262,7 @@ class BootProcess extends Process
 
                 public function cleanUp(bool $forSerialization = false): void {}
             },
-            new class implements Task {
+            new class implements TaskContract {
                 public function __invoke(?IO $io = null): ?IO
                 {
                     $config = $io->get(Config::class);
@@ -275,8 +275,8 @@ class BootProcess extends Process
                     $observerKernel = Factory::getClassInstance(ObserverKernel::class);
                     foreach ($settings as $nsSubject => $nsObserver) {
                         $reflection = new ReflectionClass($nsObserver);
-                        if (!$reflection->implementsInterface(Observer::class)) {
-                            throw new LogicException('Observer must implement ' . Observer::class . 'interface');
+                        if (!$reflection->implementsInterface(ObserverContract::class)) {
+                            throw new LogicException('Observer must implement ' . ObserverContract::class . 'interface');
                         }
 
                         $timing = $reflection->getAttributes(DeferFromFlow::class)
@@ -309,7 +309,7 @@ class BootProcess extends Process
 
                 public function cleanUp(bool $forSerialization = false): void {}
             },
-            new class implements Task {
+            new class implements TaskContract {
                 public function __invoke(?IO $io = null): IO
                 {
                     if (!chdir($io->get(Config::class)->get('app.directory'))) {

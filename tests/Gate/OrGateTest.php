@@ -33,6 +33,8 @@ class OrGateTest extends TestCase
                     ? [1, 2]
                     : [3, 4];
             }
+
+            public function cleanUp(bool $forSerialization = false): void {}
         };
 
         $reflection = new ReflectionClass($gate);
@@ -70,6 +72,8 @@ class OrGateTest extends TestCase
                     ? [1, 2]
                     : [3, 4];
             }
+
+            public function cleanUp(bool $forSerialization = false): void {}
         };
 
         $reflection = new ReflectionClass($gate);

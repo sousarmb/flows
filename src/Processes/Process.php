@@ -6,9 +6,9 @@ namespace Flows\Processes;
 
 use Collectibles\Collection;
 use Collectibles\Contracts\IO;
-use Flows\Contracts\Gate;
-use Flows\Contracts\Tasks\CleanUp;
-use Flows\Contracts\Tasks\Task;
+use Flows\Contracts\Gate as GateContract;
+use Flows\Contracts\Tasks\CleanUp as CleanUpContract;
+use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Event\Kernel as EventKernel;
 use Flows\Facades\Container;
 use Flows\Factory;
@@ -17,7 +17,7 @@ use Flows\Gates\XorGate;
 use Flows\Observer\Kernel as ObserverKernel;
 use LogicException;
 
-abstract class Process implements CleanUp
+abstract class Process implements CleanUpContract
 {
     private int $position = 0;
     private int $taskCount = 0;
@@ -43,10 +43,10 @@ abstract class Process implements CleanUp
                 $task = Factory::getClassInstance($task, $task);
             }
             if (
-                !$task instanceof Task
-                && !$task instanceof Gate
+                !$task instanceof TaskContract
+                && !$task instanceof GateContract
             ) {
-                throw new LogicException('Invalid task: must be instance of Task or Gate classes');
+                throw new LogicException('Invalid task: must be instance of Task or Gate contract');
             }
         }
 
@@ -108,10 +108,10 @@ abstract class Process implements CleanUp
     /**
      *
      * @param IO|null $io
-     * @return Gate|IO|null
+     * @return GateContract|IO|null
      * @throws LogicException
      */
-    private function handle(?IO $io = null): Gate|IO|null
+    private function handle(?IO $io = null): GateContract|IO|null
     {
         do {
             $work = $this->tasks[$this->position];
@@ -140,10 +140,10 @@ abstract class Process implements CleanUp
      * Start from first task
      *
      * @param Collection|null $io
-     * @return Gate|IO|null
+     * @return GateContract|IO|null
      * @throws LogicException
      */
-    public function run(?IO $io = null): Gate|IO|null
+    public function run(?IO $io = null): GateContract|IO|null
     {
         if ($this->done()) {
             throw new LogicException('Process already completed');
@@ -158,10 +158,10 @@ abstract class Process implements CleanUp
      * Resume where left
      * 
      * @param IO|null $io
-     * @return Gate|IO|null
+     * @return GateContract|IO|null
      * @throws LogicException
      */
-    public function resume(?IO $io = null): Gate|IO|null
+    public function resume(?IO $io = null): GateContract|IO|null
     {
         if ($this->done()) {
             throw new LogicException('Process already completed');

@@ -51,23 +51,18 @@ class InterruptedOrGatedProcessTest extends TestCase
                             return $this->coll;
                         }
 
-                        public function cleanUp(): void
+                        public function cleanUp(bool $forSerialization = false): void
                         {
                             fclose($this->coll->get('fileHandle'));
                         }
-
-                        public function __sleep(): array
-                        {
-                            return [];
-                        }
-
-                        public function __wakeup(): void {}
                     },
                     new class extends OrGate {
                         public function __invoke(): array
                         {
                             return ['SomeRandomProcessA', 'SomeRandomProcessB'];
                         }
+
+                        public function cleanUp(bool $forSerialization = false): void {}
                     },
                     new class implements Task {
                         public function __invoke(?IO $io = null): ?IO
@@ -76,14 +71,7 @@ class InterruptedOrGatedProcessTest extends TestCase
                             return $io;
                         }
 
-                        public function __sleep(): array
-                        {
-                            return [];
-                        }
-
-                        public function __wakeup(): void {}
-
-                        public function cleanUp(): void {}
+                        public function cleanUp(bool $forSerialization = false): void {}
                     },
                 ];
                 parent::__construct();

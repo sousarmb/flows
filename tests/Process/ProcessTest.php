@@ -31,17 +31,10 @@ class CreateAndWriteToFileProcess extends Process
                     return $this->coll;
                 }
 
-                public function cleanUp(): void
+                public function cleanUp(bool $forSerialization = false): void
                 {
                     fclose($this->coll->get('fileHandle'));
                 }
-
-                public function __sleep(): array
-                {
-                    return [];
-                }
-
-                public function __wakeup(): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -50,14 +43,7 @@ class CreateAndWriteToFileProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void {}
-
-                public function __sleep(): array
-                {
-                    return [];
-                }
-
-                public function __wakeup(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -66,14 +52,7 @@ class CreateAndWriteToFileProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(): void {}
-
-                public function __sleep(): array
-                {
-                    return [];
-                }
-
-                public function __wakeup(): void {}
+                public function cleanUp(bool $forSerialization = false): void {}
             }
         ];
         parent::__construct();

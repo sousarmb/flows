@@ -7,7 +7,7 @@ namespace Flows\Processes\Internal;
 use Collectibles\Collection;
 use Collectibles\Contracts\IO;
 use Flows\ApplicationKernel;
-use Flows\Contracts\Tasks\Task;
+use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Facades\Config;
 use Flows\Facades\Events;
 use Flows\Facades\Logger;
@@ -23,7 +23,7 @@ class OffloadProcess extends Process
     public function __construct()
     {
         $this->tasks = [
-            new class implements Task {
+            new class implements TaskContract {
                 public function __invoke(?IO $io = null): ?IO
                 {
                     // change to OffloadedProcess.php script directory
@@ -39,7 +39,7 @@ class OffloadProcess extends Process
 
                 public function cleanUp(bool $forSerialization = false): void {}
             },
-            new class implements Task {
+            new class implements TaskContract {
                 public function __invoke(?IO $io = null): ?IO
                 {
                     $descriptorSpec = [
@@ -66,7 +66,7 @@ class OffloadProcess extends Process
 
                 public function cleanUp(bool $forSerialization = false): void {}
             },
-            new class implements Task {
+            new class implements TaskContract {
                 use OffloadedProcess;
 
                 private array $processes;
