@@ -6,6 +6,10 @@ namespace Flows\Contracts\Tasks;
 
 interface CleanUp
 {
-
-    public function cleanUp(): void;
+    /**
+     * Runs when process/task is completed
+     * 
+     * @param bool $forSerialization TRUE => prepare for serialization, FALSE => normal termination
+     */
+    public function cleanUp(bool $forSerialization = false): void;
 }

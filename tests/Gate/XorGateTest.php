@@ -33,6 +33,8 @@ class XorGateTest extends TestCase
                     ? 'RandomProcessA'
                     : 'RandomProcessB';
             }
+
+            public function cleanUp(bool $forSerialization = false): void {}
         };
 
         $reflection = new ReflectionClass($gate);
@@ -70,6 +72,8 @@ class XorGateTest extends TestCase
                     ? 'RandomProcessA'
                     : 'RandomProcessB';
             }
+
+            public function cleanUp(bool $forSerialization = false): void {}
         };
 
         $reflection = new ReflectionClass($gate);

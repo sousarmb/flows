@@ -51,7 +51,7 @@ class InterruptedXorGatedProcessTest extends TestCase
                             return $this->coll;
                         }
 
-                        public function cleanUp(): void
+                        public function cleanUp(bool $forSerialization = false): void
                         {
                             fclose($this->coll->get('fileHandle'));
                         }
@@ -61,6 +61,8 @@ class InterruptedXorGatedProcessTest extends TestCase
                         {
                             return 'SomeRandomProcess';
                         }
+
+                        public function cleanUp(bool $forSerialization = false): void {}
                     },
                     new class implements Task {
                         public function __invoke(?IO $io = null): ?IO
@@ -69,14 +71,14 @@ class InterruptedXorGatedProcessTest extends TestCase
                             return $io;
                         }
 
-                        public function cleanUp(): void {}
+                        public function cleanUp(bool $forSerialization = false): void {}
                     },
                 ];
                 parent::__construct();
             }
         };
 
-        $result = $process->process();
+        $result = $process->run();
 
         self::assertFileExists($this->tempFile);
         self::assertInstanceOf(Gate::class, $result);
