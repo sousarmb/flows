@@ -55,6 +55,13 @@ class InterruptedOrGatedProcessTest extends TestCase
                         {
                             fclose($this->coll->get('fileHandle'));
                         }
+
+                        public function __sleep(): array
+                        {
+                            return [];
+                        }
+
+                        public function __wakeup(): void {}
                     },
                     new class extends OrGate {
                         public function __invoke(): array
@@ -69,6 +76,13 @@ class InterruptedOrGatedProcessTest extends TestCase
                             return $io;
                         }
 
+                        public function __sleep(): array
+                        {
+                            return [];
+                        }
+
+                        public function __wakeup(): void {}
+
                         public function cleanUp(): void {}
                     },
                 ];
@@ -76,7 +90,7 @@ class InterruptedOrGatedProcessTest extends TestCase
             }
         };
 
-        $result = $process->process();
+        $result = $process->run();
 
         self::assertFileExists($this->tempFile);
         self::assertInstanceOf(Gate::class, $result);

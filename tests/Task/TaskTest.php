@@ -26,6 +26,13 @@ class DummyTask implements Task
             $this->coll->delete('item');
         }
     }
+
+    public function __sleep(): array
+    {
+        return [];
+    }
+
+    public function __wakeup(): void {}
 }
 
 /**

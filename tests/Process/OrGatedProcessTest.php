@@ -49,6 +49,13 @@ class OrGatedProcessTest extends TestCase
                         {
                             fclose($this->coll->get('fileHandle'));
                         }
+
+                        public function __sleep(): array
+                        {
+                            return [];
+                        }
+
+                        public function __wakeup(): void {}
                     },
                     new class implements Task {
                         public function __invoke(?IO $io = null): ?IO
@@ -58,6 +65,13 @@ class OrGatedProcessTest extends TestCase
                         }
 
                         public function cleanUp(): void {}
+
+                        public function __sleep(): array
+                        {
+                            return [];
+                        }
+
+                        public function __wakeup(): void {}
                     },
                     new class extends OrGate {
                         public function __invoke(): array
@@ -70,7 +84,7 @@ class OrGatedProcessTest extends TestCase
             }
         };
 
-        $result = $process->process();
+        $result = $process->run();
 
         self::assertFileExists($this->tempFile);
         $content = file_get_contents($this->tempFile);

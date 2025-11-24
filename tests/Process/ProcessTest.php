@@ -35,6 +35,13 @@ class CreateAndWriteToFileProcess extends Process
                 {
                     fclose($this->coll->get('fileHandle'));
                 }
+
+                public function __sleep(): array
+                {
+                    return [];
+                }
+
+                public function __wakeup(): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -44,6 +51,13 @@ class CreateAndWriteToFileProcess extends Process
                 }
 
                 public function cleanUp(): void {}
+
+                public function __sleep(): array
+                {
+                    return [];
+                }
+
+                public function __wakeup(): void {}
             },
             new class implements Task {
                 public function __invoke(?IO $io = null): ?IO
@@ -53,6 +67,13 @@ class CreateAndWriteToFileProcess extends Process
                 }
 
                 public function cleanUp(): void {}
+
+                public function __sleep(): array
+                {
+                    return [];
+                }
+
+                public function __wakeup(): void {}
             }
         ];
         parent::__construct();
@@ -86,7 +107,7 @@ class ProcessTest extends TestCase
     public function testProcessExecutesAllTasksCreatesFileAndCleansUp(): void
     {
         $process = new CreateAndWriteToFileProcess();
-        $result = $process->process();
+        $result = $process->run();
 
         $this->assertInstanceOf(Collection::class, $result);
         $this->assertInstanceOf(IO::class, $result);
@@ -115,7 +136,7 @@ class ProcessTest extends TestCase
     {
         $process = new CreateAndWriteToFileProcess();
 
-        $result = $process->process(null);
+        $result = $process->run(null);
 
         $this->assertInstanceOf(Collection::class, $result);
         $this->assertInstanceOf(IO::class, $result);
