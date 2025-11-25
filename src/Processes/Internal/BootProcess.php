@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Flows\Processes\Internal;
 
 use Collectibles\Collection;
-use Collectibles\Contracts\IO;
+use Collectibles\Contracts\IO as IOContract;
 use Composer\InstalledVersions;
 use Exception;
 use Flows\ApplicationKernel;
@@ -44,7 +44,7 @@ class BootProcess extends Process
     {
         $this->tasks = [
             new class implements TaskContract {
-                public function __invoke(?IO $io = null): ?IO
+                public function __invoke(?IOContract $io = null): ?IOContract 
                 {
                     return new Collection();
                 }
@@ -52,7 +52,7 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IO $io = null): ?IO
+                public function __invoke(?IOContract $io = null): ?IOContract 
                 {
                     $packageName = InstalledVersions::getRootPackage()['name'];
                     $vendorDir = InstalledVersions::getInstallPath($packageName);
@@ -82,7 +82,7 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IO $io = null): ?IO
+                public function __invoke(?IOContract $io = null): ?IOContract 
                 {
                     $config = $io->get(Config::class);
                     $logger = new Logger('debug');
@@ -107,7 +107,7 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IO $io = null): ?IO
+                public function __invoke(?IOContract $io = null): ?IOContract 
                 {
                     $config = $io->get(Config::class);
                     if (!chdir($config->get('app.config.directory'))) {
@@ -125,7 +125,7 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IO $io = null): ?IO
+                public function __invoke(?IOContract $io = null): ?IOContract 
                 {
                     $config = $io->get(Config::class);
                     $file = $config->get('app.config.files.0'); // app.php
@@ -149,7 +149,7 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IO $io = null): ?IO
+                public function __invoke(?IOContract $io = null): ?IOContract 
                 {
                     $config = $io->get(Config::class);
                     $file = $config->get('app.config.files.1'); // service-provider.php
@@ -216,7 +216,7 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IO $io = null): ?IO
+                public function __invoke(?IOContract $io = null): ?IOContract 
                 {
                     $config = $io->get(Config::class);
                     $file = $config->get('app.config.files.2'); // event-handler.php
@@ -263,7 +263,7 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IO $io = null): ?IO
+                public function __invoke(?IOContract $io = null): ?IOContract 
                 {
                     $config = $io->get(Config::class);
                     $file = $config->get('app.config.files.3'); // subject-observer.php
@@ -310,7 +310,7 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IO $io = null): IO
+                public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     if (!chdir($io->get(Config::class)->get('app.directory'))) {
                         throw new Exception('Could not change to application directory');

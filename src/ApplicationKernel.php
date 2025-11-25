@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Flows;
 
 use Collectibles\Collection;
-use Collectibles\Contracts\IO;
+use Collectibles\Contracts\IO as IOContract;
 use Flows\Container\Container;
 use Flows\Event\Kernel as EventKernel;
 use Flows\Facades\Config;
@@ -32,7 +32,7 @@ class ApplicationKernel
     private SplStack $stack;
     private static bool $fullStop;
 
-    private function flow(): ?IO
+    private function flow(): ?IOContract 
     {
         $collection = new Collection();
         $end = false;
@@ -137,13 +137,13 @@ class ApplicationKernel
      * Process the flow
      * 
      * @param string $nsInitialProcess Start with this process
-     * @param ?IO $io Give it this input
+     * @param ?IOContract $io Give it this input
      * @return IO|null
      */
     public function process(
         string $nsInitialProcess,
-        ?IO $io = null
-    ): ?IO {
+        ?IOContract $io = null
+    ): ?IOContract {
         $this->stack->push([
             // Start flow with this process
             $this->processes->getNamed($nsInitialProcess),

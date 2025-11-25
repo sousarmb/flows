@@ -2,15 +2,16 @@
 
 declare(strict_types=1);
 
-namespace Flows\Gates;
+namespace Flows\Processes\Signal;
 
 use Collectibles\Contracts\IO as IOContract;
-use Flows\Contracts\Gate as GateContract;
 use Flows\Contracts\Tasks\CleanUp as CleanUpContract;
 
-abstract class Gate implements GateContract, CleanUpContract
+abstract class UndoState implements CleanUpContract
 {
     protected ?IOContract $io;
+
+    abstract public function __invoke(): int;
 
     /**
      *
@@ -27,17 +28,8 @@ abstract class Gate implements GateContract, CleanUpContract
      *
      * @return IO|null
      */
-    public function getIO(): ?IOContract 
+    public function getIO(): ?IOContract
     {
         return $this->io;
-    }
-
-    /**
-     * 
-     * @return array<int, mixed>
-     */
-    public function __sleep(): array
-    {
-        return ['io'];
     }
 }
