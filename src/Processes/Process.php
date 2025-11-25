@@ -4,23 +4,27 @@ declare(strict_types=1);
 
 namespace Flows\Processes;
 
-use Collectibles\Collection;
-use Collectibles\Contracts\IO;
+use Collectibles\Contracts\IO as IOContract;
 use Flows\Contracts\Gate as GateContract;
 use Flows\Contracts\Tasks\CleanUp as CleanUpContract;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Event\Kernel as EventKernel;
 use Flows\Facades\Container;
+use Flows\Facades\Logger;
 use Flows\Factory;
 use Flows\Gates\OrGate;
 use Flows\Gates\XorGate;
 use Flows\Observer\Kernel as ObserverKernel;
+use Flows\Processes\Signal\SaveState;
+use Flows\Processes\Signal\UndoState;
 use LogicException;
+use RuntimeException;
+use SplStack;
 
 abstract class Process implements CleanUpContract
 {
     private int $position = 0;
-    private int $taskCount = 0;
+    private readonly int $taskCount;
     protected array $tasks = [];
     private ?EventKernel $events = null;
     private ?ObserverKernel $observers = null;
@@ -29,8 +33,9 @@ abstract class Process implements CleanUpContract
      *
      * @throws LogicException
      */
-    public function __construct()
-    {
+    public function __construct(
+        private readonly SplStack $state = new SplStack()
+    ) {
         if ([] === $this->tasks) {
             throw new LogicException('Invalid process: no tasks to process');
         }
@@ -42,10 +47,7 @@ abstract class Process implements CleanUpContract
             ) {
                 $task = Factory::getClassInstance($task, $task);
             }
-            if (
-                !$task instanceof TaskContract
-                && !$task instanceof GateContract
-            ) {
+            if ($this->invalidProcessMember($task)) {
                 throw new LogicException('Invalid task: must be instance of Task or Gate contract');
             }
         }
@@ -71,7 +73,9 @@ abstract class Process implements CleanUpContract
         $this->observers?->handleDeferFromProcess();
         for ($i = $this->taskCount - 1; $i >= 0; $i--) {
             // Propagate signal to tasks
-            $this->tasks[$i]->cleanUp($forSerialization);
+            if (!$this->tasks[$i] instanceof SaveState) {
+                $this->tasks[$i]->cleanUp($forSerialization);
+            }
         }
     }
 
@@ -107,11 +111,11 @@ abstract class Process implements CleanUpContract
 
     /**
      *
-     * @param IO|null $io
-     * @return GateContract|IO|null
-     * @throws LogicException
+     * @param IOContract|null $io
+     * @return GateContract|IOContract|null
+     * @throws RuntimeException
      */
-    private function handle(?IO $io = null): GateContract|IO|null
+    private function handle(?IOContract $io = null): GateContract|IOContract|null
     {
         do {
             $work = $this->tasks[$this->position];
@@ -122,15 +126,33 @@ abstract class Process implements CleanUpContract
                 return $work;
             } elseif ($work instanceof OrGate) {
                 $this->makeObservation($work->setIO($io));
-                // Always advance past OrGate (prevents infinite loop on first task)
+                // Always advance past OrGate (prevent infinite loop on first task)
                 $this->position++;
                 return $work;
+            } elseif ($work instanceof SaveState) {
+                $this->state->push([$this->position, $io]);
+            } elseif ($work instanceof UndoState) {
+                if ($this->state->count() === 0) {
+                    throw new RuntimeException('No savepoint available');
+                }
+
+                $undo = $work->setIO($io)();
+                $this->makeObservation($work);
+                if ($undo > 0) {
+                    while ($undo && [$savedPosition, $io] = $this->state->pop()) {
+                        $undo--;
+                    }
+                    $this->position = $savedPosition;
+                }
+
+                Logger::info(__CLASS__ . ": undo {$undo}");
             } else {
                 // Regular task, do the work
                 $io = $work($io);
                 $this->makeObservation($io);
-                $this->position++;
             }
+            // Keep working
+            $this->position++;
         } while ($this->position < $this->taskCount);
         return $io;
     }
@@ -140,10 +162,10 @@ abstract class Process implements CleanUpContract
      * Start from first task
      *
      * @param Collection|null $io
-     * @return GateContract|IO|null
+     * @return GateContract|IOContract|null
      * @throws LogicException
      */
-    public function run(?IO $io = null): GateContract|IO|null
+    public function run(?IOContract $io = null): GateContract|IOContract|null
     {
         if ($this->done()) {
             throw new LogicException('Process already completed');
@@ -157,11 +179,11 @@ abstract class Process implements CleanUpContract
      *
      * Resume where left
      * 
-     * @param IO|null $io
-     * @return GateContract|IO|null
+     * @param IOContract|null $io
+     * @return GateContract|IOContract|null
      * @throws LogicException
      */
-    public function resume(?IO $io = null): GateContract|IO|null
+    public function resume(?IOContract $io = null): GateContract|IOContract|null
     {
         if ($this->done()) {
             throw new LogicException('Process already completed');
@@ -170,9 +192,10 @@ abstract class Process implements CleanUpContract
         return $this->handle($io);
     }
 
-    private function makeObservation(object $subject): void
+    private function makeObservation(GateContract|IOContract|UndoState|null $subject): void
     {
-        $this->observers?->observe($subject);
+        // Null-safe observation
+        $subject && $this->observers?->observe($subject);
     }
 
     /**
@@ -191,6 +214,7 @@ abstract class Process implements CleanUpContract
     /**
      * 
      * Re-bind event and observer kernel if container ready.
+     * Start savepoint stack.
      */
     public function __wakeup(): void
     {
@@ -199,5 +223,22 @@ abstract class Process implements CleanUpContract
             $this->events = Container::get(EventKernel::class);
             $this->observers = Container::get(ObserverKernel::class);
         }
+
+        $this->state = new SplStack();
+    }
+
+    /**
+     * 
+     * Check if class is allowed as a process task class
+     * 
+     * @param object $task To assert class
+     * @return bool TRUE => valid, FALSE => not valid
+     */
+    private function invalidProcessMember(object $task): bool
+    {
+        return !$task instanceof TaskContract
+            && !$task instanceof GateContract
+            && !$task instanceof SaveState
+            && !$task instanceof UndoState;
     }
 }
