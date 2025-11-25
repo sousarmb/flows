@@ -42,8 +42,8 @@ class ProcessRegistry
             : $attrib[0]->newInstance()->getIsSingleton();
         $className = $reflection->getName();
         $this->processes[$className] = $isSingleton
-            ? ($process instanceof Process ? $process : Factory::getClassInstance($className))
-            : $className;
+            ? ($process instanceof Process ? $process : Factory::getClassInstance($className)) // Registered as a singleton
+            : $className; // Not registered as a singleton
 
         return $this;
     }
