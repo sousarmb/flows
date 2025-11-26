@@ -2,6 +2,6 @@
 
 declare(strict_types=1);
 
-namespace Flows\Processes\Signal;
+namespace Flows\Processes\Sign;
 
 final class SaveState {}
