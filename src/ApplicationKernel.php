@@ -10,8 +10,8 @@ use Flows\Container\Container;
 use Flows\Event\Kernel as EventKernel;
 use Flows\Facades\Config;
 use Flows\Facades\Logger;
-use Flows\Gates\OffloadOrGate;
-use Flows\Gates\OrGate;
+use Flows\Gates\OffloadAndGate;
+use Flows\Gates\AndGate;
 use Flows\Gates\XorGate;
 use Flows\Observer\Kernel as ObserverKernel;
 use Flows\Processes\Internal\BootProcess;
@@ -81,7 +81,7 @@ class ApplicationKernel
                     // And no source process, nothing to resume, just go forward to next process
                     null
                 ]);
-            } elseif ($gateOrReturn instanceof OffloadOrGate) {
+            } elseif ($gateOrReturn instanceof OffloadAndGate) {
                 $offloadOrProcesses = $gateOrReturn();
                 if (empty($offloadOrProcesses)) {
                     throw new LogicException('Empty return from gate ' . get_class($gateOrReturn));
@@ -98,7 +98,7 @@ class ApplicationKernel
                 );
                 // Resume next loop
                 $this->stack->push([$process, null, $source]);
-            } elseif ($gateOrReturn instanceof OrGate) {
+            } elseif ($gateOrReturn instanceof AndGate) {
                 // This process is interrupted (it started with some other input), will resume later
                 $this->stack->push([$process, null, $source]);
                 // These processes will run next, as if run in a parallel manner, all with the same input

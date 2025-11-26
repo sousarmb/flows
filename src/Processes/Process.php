@@ -12,11 +12,12 @@ use Flows\Event\Kernel as EventKernel;
 use Flows\Facades\Container;
 use Flows\Facades\Logger;
 use Flows\Factory;
-use Flows\Gates\OrGate;
+use Flows\Gates\AndGate;
+use Flows\Gates\FuseGate;
+use Flows\Gates\UndoStateGate;
 use Flows\Gates\XorGate;
 use Flows\Observer\Kernel as ObserverKernel;
-use Flows\Processes\Signal\SaveState;
-use Flows\Processes\Signal\UndoState;
+use Flows\Processes\Sign\SaveState;
 use LogicException;
 use RuntimeException;
 use SplStack;
@@ -118,37 +119,44 @@ abstract class Process implements CleanUpContract
     private function handle(?IOContract $io = null): GateContract|IOContract|null
     {
         do {
-            $work = $this->tasks[$this->position];
-            if ($work instanceof XorGate) {
-                $this->makeObservation($work->setIO($io));
+            $task = $this->tasks[$this->position];
+            if ($task instanceof XorGate) {
+                $this->makeObservation($task->setIO($io));
                 // XorGate always ends the process
                 $this->position = $this->taskCount;
-                return $work;
-            } elseif ($work instanceof OrGate) {
-                $this->makeObservation($work->setIO($io));
-                // Always advance past OrGate (prevent infinite loop on first task)
+                return $task;
+            } elseif ($task instanceof AndGate) {
+                $this->makeObservation($task->setIO($io));
+                // Always advance past AndGate (prevent infinite loop on first task)
                 $this->position++;
-                return $work;
-            } elseif ($work instanceof SaveState) {
+                return $task;
+            } elseif ($task instanceof SaveState) {
                 $this->state->push([$this->position, $io]);
-            } elseif ($work instanceof UndoState) {
+            } elseif ($task instanceof UndoStateGate) {
                 if ($this->state->count() === 0) {
-                    throw new RuntimeException('No savepoint available');
+                    throw new RuntimeException(get_class($this) . ': no savepoint available');
                 }
 
-                $undo = $work->setIO($io)();
-                $this->makeObservation($work);
+                $undo = $task->setIO($io)();
+                $this->makeObservation($task);
                 if ($undo > 0) {
                     while ($undo && [$savedPosition, $io] = $this->state->pop()) {
                         $undo--;
                     }
                     $this->position = $savedPosition;
                 }
-
-                Logger::info(__CLASS__ . ": undo {$undo}");
+            } elseif ($task instanceof FuseGate) {
+                if (!$task->setIO($io)()) {
+                    // Exit, blown fuse!
+                    $this->makeObservation($task->setIO($io));
+                    // Don't advance position, should process resume (outside decision), fuse must be checked again
+                    return $task->noYesReturn()
+                        ? $io
+                        : null;
+                }
             } else {
-                // Regular task, do the work
-                $io = $work($io);
+                // Regular task, do it
+                $io = $task($io);
                 $this->makeObservation($io);
             }
             // Keep working
@@ -192,7 +200,7 @@ abstract class Process implements CleanUpContract
         return $this->handle($io);
     }
 
-    private function makeObservation(GateContract|IOContract|UndoState|null $subject): void
+    private function makeObservation(GateContract|IOContract|null $subject): void
     {
         // Null-safe observation
         $subject && $this->observers?->observe($subject);
@@ -239,6 +247,7 @@ abstract class Process implements CleanUpContract
         return !$task instanceof TaskContract
             && !$task instanceof GateContract
             && !$task instanceof SaveState
-            && !$task instanceof UndoState;
+            && !$task instanceof UndoStateGate
+            && !$task instanceof FuseGate;
     }
 }
