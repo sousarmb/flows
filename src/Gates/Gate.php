@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Flows\Gates;
 
 use Collectibles\Contracts\IO as IOContract;
-use Flows\Contracts\Gate as GateContract;
+use Flows\Contracts\Gates\Gate as GateContract;
 use Flows\Contracts\Tasks\CleanUp as CleanUpContract;
 
 abstract class Gate implements GateContract, CleanUpContract

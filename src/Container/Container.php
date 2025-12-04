@@ -7,7 +7,7 @@ namespace Flows\Container;
 use Collectibles\Collection;
 use Flows\Container\ServiceImplementation\Abstraction;
 use Flows\Container\ServiceImplementation\Concrete;
-use Flows\Contracts\Container\Entry;
+use Flows\Contracts\Container\Entry as EntryContract;
 use Flows\Factory;
 use Flows\Processes\Internal\BootProcess;
 use LogicException;
@@ -48,7 +48,7 @@ class Container
         return $this->fabricate($entry, $caller);
     }
 
-    private function fabricate(Entry $entry, ?string $caller = null): object
+    private function fabricate(EntryContract $entry, ?string $caller = null): object
     {
         $provides = $entry->provides();
         if ($entry instanceof Abstraction) {
@@ -126,12 +126,12 @@ class Container
      * Register services and service providers into container.
      * Allows setting of concrete service classes instances after container boot.
      *
-     * @param Entry $entry
+     * @param EntryContract $entry
      * @param null|object $implementation Service instance
      * @throws LogicException When registering service ($implementation) instances before booting
      * @throws LogicException When $entry instance is not Concrete type and $implementation is not null
      */
-    public function register(Entry $entry, ?object $implementation = null): self
+    public function register(EntryContract $entry, ?object $implementation = null): self
     {
         if ($implementation) {
             $this->services->set($implementation, $entry->provides());

@@ -10,8 +10,9 @@ use Flows\Container\Container;
 use Flows\Event\Kernel as EventKernel;
 use Flows\Facades\Config;
 use Flows\Facades\Logger;
-use Flows\Gates\OffloadAndGate;
 use Flows\Gates\AndGate;
+use Flows\Gates\EventGate;
+use Flows\Gates\OffloadAndGate;
 use Flows\Gates\XorGate;
 use Flows\Observer\Kernel as ObserverKernel;
 use Flows\Processes\Internal\BootProcess;
@@ -32,7 +33,7 @@ class ApplicationKernel
     private SplStack $stack;
     private static bool $fullStop;
 
-    private function flow(): ?IOContract 
+    private function flow(): ?IOContract
     {
         $collection = new Collection();
         $end = false;
@@ -67,7 +68,10 @@ class ApplicationKernel
                     $collection->delete($nsProcess);
                 }
             }
-            if ($gateOrReturn instanceof XorGate) {
+            if (
+                $gateOrReturn instanceof XorGate
+                || $gateOrReturn instanceof EventGate
+            ) {
                 $process->cleanUp();
                 if (!static::isOffloadedProcess()) {
                     // Only one process in offloaded processes, no need for extra work

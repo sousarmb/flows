@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace Flows\Contracts;
+namespace Flows\Contracts\Gates;
 
 use Collectibles\Contracts\IO as IOContract;
-use Flows\Contracts\Tasks\CleanUp;
+use Flows\Contracts\Tasks\CleanUp as CleanUpContract;
 
-interface Gate extends CleanUp
+interface Gate extends CleanUpContract
 {
     /**
      *

@@ -5,14 +5,14 @@ declare(strict_types=1);
 namespace Flows\Processes;
 
 use Collectibles\Contracts\IO as IOContract;
-use Flows\Contracts\Gate as GateContract;
+use Flows\Contracts\Gates\Gate as GateContract;
 use Flows\Contracts\Tasks\CleanUp as CleanUpContract;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Event\Kernel as EventKernel;
 use Flows\Facades\Container;
-use Flows\Facades\Logger;
 use Flows\Factory;
 use Flows\Gates\AndGate;
+use Flows\Gates\EventGate;
 use Flows\Gates\FuseGate;
 use Flows\Gates\UndoStateGate;
 use Flows\Gates\XorGate;
@@ -120,7 +120,10 @@ abstract class Process implements CleanUpContract
     {
         do {
             $task = $this->tasks[$this->position];
-            if ($task instanceof XorGate) {
+            if (
+                $task instanceof XorGate
+                || $task instanceof EventGate
+            ) {
                 $this->makeObservation($task->setIO($io));
                 // XorGate always ends the process
                 $this->position = $this->taskCount;
