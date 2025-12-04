@@ -41,6 +41,10 @@ class Reactor
         foreach ($this->timers as $i => [$time, $callback, $repeat, $interval]) {
             if ($now >= $time) {
                 $callback($this);
+                if ([] === $this->timers) {
+                    // stoprun() called in callback, nothing else to do
+                    return;
+                }
                 if ($repeat) {
                     $this->timers[$i][0] = $now + $interval;
                 } else {
