@@ -80,9 +80,9 @@ class ProcessRegistry
     /**
      *
      * @param string $nsProcess
-     * @return bool
+     * @return bool If process is registered
      */
-    public function exists(string $nsProcess): bool
+    public function has(string $nsProcess): bool
     {
         return isset($this->processes[$nsProcess]);
     }
