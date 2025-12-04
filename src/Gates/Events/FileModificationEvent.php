@@ -10,7 +10,7 @@ use LogicException;
 
 /**
  * 
- * Event gate, waits n seconds till a file modification occurs
+ * Event gate, check every N seconds if a given file is modified (file size and modification time)
  */
 final readonly class FileModificationEvent implements GateEventContract, FrequentContract
 {
@@ -22,12 +22,12 @@ final readonly class FileModificationEvent implements GateEventContract, Frequen
          */
         private string $file,
         /**
-         * @var int frequency to check for modifications, in milliseconds
+         * @var float frequency to check for modifications, in seconds
          */
-        private float $frequency = 0
+        private float $frequency = 1
     ) {
         if (!is_file($this->file)) {
-            throw new LogicException('File must exist for gate event');
+            throw new LogicException('File must exist to gate event');
         }
 
         clearstatcache(true, $this->file);

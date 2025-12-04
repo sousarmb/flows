@@ -11,7 +11,7 @@ use RuntimeException;
 
 /**
  * 
- * Event gate, waits n seconds till a something is written on a pipe
+ * Event gate, wait till a something is written on a given pipe file
  */
 abstract readonly class PipeReadEvent implements GateEventContract, PipeListenerContract
 {
@@ -27,12 +27,12 @@ abstract readonly class PipeReadEvent implements GateEventContract, PipeListener
         private string $filePath,
     ) {
         if (!is_readable($filePath)) {
-            throw new LogicException('File must exist and be readable for gate event');
+            throw new LogicException('Pipe file must exist and be readable to gate event');
         }
 
         $fHandle = fopen($this->filePath, 'r');
         if (false === $fHandle) {
-            throw new RuntimeException('Could not open file fo reading');
+            throw new RuntimeException('Could not open pipe file fo reading');
         }
 
         $this->fHandle = $fHandle;
