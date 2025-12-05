@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Flows\Gates\Internal\Events;
+namespace Flows\Gates\Events;
 
 use Flows\Contracts\Gates\GateEvent as GateEventContract;
 use Flows\Contracts\Gates\PipeListener as PipeListenerContract;

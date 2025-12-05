@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Flows\Gates\Internal\Events;
+namespace Flows\Gates\Events;
 
 use Flows\Contracts\Gates\Frequent as FrequentContract;
 use Flows\Contracts\Gates\GateEvent as GateEventContract;
@@ -12,7 +12,7 @@ use LogicException;
  * 
  * Event gate, check every N seconds if a given file is modified (file size and modification time)
  */
-final readonly class FileModificationEvent implements GateEventContract, FrequentContract
+final readonly class FileModificationEvent implements FrequentContract, GateEventContract 
 {
     private array $lastCheck;
 

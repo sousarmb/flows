@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Flows\Gates\Internal\Events;
+namespace Flows\Gates\Events;
 
 use Flows\Contracts\Gates\Frequent as FrequentContract;
 use Flows\Contracts\Gates\GateEvent as GateEventContract;
@@ -13,7 +13,7 @@ use RuntimeException;
  * 
  * Event gate, run prepared statement every N seconds, resolves on result set size of 1 or more (row count)
  */
-final readonly class SqlRowCountEvent implements GateEventContract, FrequentContract
+final readonly class SqlRowCountEvent implements FrequentContract, GateEventContract
 {
     public function __construct(
         /**
