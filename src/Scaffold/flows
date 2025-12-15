@@ -1,0 +1,80 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Flows\Processes\Internal\IO\CLICollection;
+
+require __DIR__ . '/../../vendor/autoload.php';
+
+define('FLOWS_COMMAND_CONTEXT', 0);
+
+function parseCommandArguments(array $argv): array
+{
+    if ([] === $argv) {
+        return $argv;
+    }
+
+    $temp = [];
+    foreach ($argv as $argumentValue) {
+        if ($equalPos =  strpos($argumentValue, '=')) {
+            $argument = trim(substr($argumentValue, 0, $equalPos));
+            $value = trim(substr($argumentValue, $equalPos + 1));
+            $temp[$argument] = $value;
+        } else {
+            $temp[trim($argumentValue)] = null;
+        }
+    }
+    return $temp;
+}
+
+function main(array $argv, int $argc): bool
+{
+    $tmp = explode(':', strtolower($argv[1]), 2);
+    if (1 === count($tmp)) {
+        throw new RuntimeException("Missing command or process name");
+    }
+
+    list($command, $processName) = $tmp;
+    $command = ucfirst(trim($command));
+    $processName = ucfirst(trim($processName));
+    $process = sprintf('Flows\Processes\Internal\CLI\%s\%sProcess', $command, $processName);
+    if (!class_exists($process, true)) {
+        throw new RuntimeException("Invalid command {$command}:{$processName}");
+    }
+
+    $process = new $process;
+    if (isset($argv[2]) && $argv[2] === 'help') {
+        echo PHP_EOL . $process->getHelp() . PHP_EOL;
+        echo PHP_EOL . 'Command arguments:' . PHP_EOL;
+        var_dump($process->getArguments());
+        echo PHP_EOL;
+        return true;
+    }
+    // Check process arguments
+    $parsedArguments = parseCommandArguments(
+        array_slice($argv, 2, count($process->getArguments()))
+    );
+    if (!$process->checkArguments($parsedArguments)) {
+        echo PHP_EOL . 'Invalid arguments. Valid arguments:' . PHP_EOL;
+        var_dump($process->getArguments());
+        return false;
+    }
+    // Run the process
+    $input = new CLICollection();
+    if ($argc > 2) {
+        $input->set($parsedArguments, 'argv');
+    }
+
+    $output = $process->run($input);
+    if (null === $output) {
+        echo PHP_EOL . 'Command output is null' . PHP_EOL;
+        return false;
+    }
+
+    echo PHP_EOL . 'Command output:' . PHP_EOL;
+    echo $output->get('message') . PHP_EOL . PHP_EOL;
+    return $output->get('success');
+}
+
+exit((int)main($argv, $argc));

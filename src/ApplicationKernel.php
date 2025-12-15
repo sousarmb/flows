@@ -38,7 +38,7 @@ class ApplicationKernel
         $collection = new Collection();
         $end = false;
         if ($this->booted) {
-            $keepOutput = Config::getApplicationSettings()->get('gate.io.keep', false);
+            $keepOutput = Config::getApplicationSettings()->get('gate.on_branch.keep_io', false);
         }
 
         do {

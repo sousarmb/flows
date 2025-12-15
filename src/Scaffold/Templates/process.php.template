@@ -1,0 +1,17 @@
+<?php
+
+namespace App\Processes;
+
+use Flows\Processes\Process;
+<!--use-list-->
+
+class <!--process-name--> extends Process
+{
+    public function __construct()
+    {
+        $this->tasks = [
+<!--task-list-->
+        ];
+        parent::__construct();
+    }
+}

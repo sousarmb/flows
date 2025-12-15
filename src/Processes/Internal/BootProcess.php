@@ -44,7 +44,11 @@ class BootProcess extends Process
     {
         $this->tasks = [
             new class implements TaskContract {
-                public function __invoke(?IOContract $io = null): ?IOContract 
+                /**
+                 * @param IOContract|Collection|null $io
+                 * @return IOContract|null
+                 */
+                public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     return new Collection();
                 }
@@ -52,7 +56,11 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IOContract $io = null): ?IOContract 
+                /**
+                 * @param IOContract|Collection|null $io
+                 * @return IOContract|null
+                 */
+                public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     $packageName = InstalledVersions::getRootPackage()['name'];
                     $vendorDir = InstalledVersions::getInstallPath($packageName);
@@ -82,7 +90,11 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IOContract $io = null): ?IOContract 
+                /**
+                 * @param IOContract|Collection|null $io
+                 * @return IOContract|null
+                 */
+                public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     $config = $io->get(Config::class);
                     $logger = new Logger('debug');
@@ -107,7 +119,11 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IOContract $io = null): ?IOContract 
+                /**
+                 * @param IOContract|Collection|null $io
+                 * @return IOContract|null
+                 */
+                public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     $config = $io->get(Config::class);
                     if (!chdir($config->get('app.config.directory'))) {
@@ -125,7 +141,11 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IOContract $io = null): ?IOContract 
+                /**
+                 * @param IOContract|Collection|null $io
+                 * @return IOContract|null
+                 */
+                public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     $config = $io->get(Config::class);
                     $file = $config->get('app.config.files.0'); // app.php
@@ -149,7 +169,11 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IOContract $io = null): ?IOContract 
+                /**
+                 * @param IOContract|Collection|null $io
+                 * @return IOContract|null
+                 */
+                public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     $config = $io->get(Config::class);
                     $file = $config->get('app.config.files.1'); // service-provider.php
@@ -216,7 +240,11 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IOContract $io = null): ?IOContract 
+                /**
+                 * @param IOContract|Collection|null $io
+                 * @return IOContract|null
+                 */
+                public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     $config = $io->get(Config::class);
                     $file = $config->get('app.config.files.2'); // event-handler.php
@@ -263,7 +291,11 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IOContract $io = null): ?IOContract 
+                /**
+                 * @param IOContract|Collection|null $io
+                 * @return IOContract|null
+                 */
+                public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     $config = $io->get(Config::class);
                     $file = $config->get('app.config.files.3'); // subject-observer.php
@@ -310,6 +342,10 @@ class BootProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
+                /**
+                 * @param IOContract|Collection|null $io
+                 * @return IOContract|null
+                 */
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     if (!chdir($io->get(Config::class)->get('app.directory'))) {
