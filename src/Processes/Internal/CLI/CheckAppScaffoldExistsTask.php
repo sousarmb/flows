@@ -7,7 +7,7 @@ use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Processes\Internal\IO\CLICollection;
 use LogicException;
 
-class CheckAppScaffoldExists implements TaskContract
+class CheckAppScaffoldExistsTask implements TaskContract
 {
     /**
      * @param IOContract|CLICollection|null $io

@@ -1,0 +1,12 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Events;
+
+use Flows\Event\Event;
+
+readonly class <!--event-name-->Event extends Event
+{
+    public function __construct() {}
+}

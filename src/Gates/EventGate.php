@@ -6,7 +6,7 @@ namespace Flows\Gates;
 
 use Flows\Contracts\Gates\Frequent as FrequentContract;
 use Flows\Contracts\Gates\GateEvent as GateEventContract;
-use Flows\Contracts\Gates\PipeListener as PipeListenerContract;
+use Flows\Contracts\Gates\Stream as StreamContract;
 use Flows\Gates\Gate;
 use Flows\Reactor\Reactor;
 use LogicException;
@@ -81,12 +81,12 @@ abstract class EventGate extends Gate
                     true
                 );
             } elseif (
-                $event instanceof PipeListenerContract
+                $event instanceof StreamContract
                 && $event instanceof GateEventContract
             ) {
-                stream_set_blocking($event->getPipe(), false);
+                stream_set_blocking($event->getStream(), false);
                 $reactor->onReadable(
-                    $event->getPipe(),
+                    $event->getStream(),
                     function ($stream, $reactor) use ($event) {
                         if ($event->resolve($stream)) {
                             $reactor->stopRun();

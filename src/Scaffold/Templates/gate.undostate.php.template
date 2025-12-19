@@ -1,0 +1,20 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Processes\Gates;
+
+use Flows\Gates\UndoStateGate;
+
+class <!--gate-name-->Gate extends UndoStateGate
+{
+    /**
+     * @return int
+     */
+    public function __invoke(): int {}
+
+    /**
+     * @param bool $forSerialization
+     */
+    public function cleanUp(bool $forSerialization = false): void {}
+}

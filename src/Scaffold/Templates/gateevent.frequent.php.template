@@ -1,0 +1,25 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Events;
+
+use Flows\Contracts\Gates\Frequent as FrequentContract;
+use Flows\Contracts\Gates\GateEvent as GateEventContract;
+
+class <!--event-name-->GateEvent implements FrequentContract, GateEventContract
+{
+    public function __construct() {}
+
+    public function resolve($data = null): bool {}
+
+    public function getFrequency(): float
+    {
+        return $this->frequency;
+    }
+
+    public function setFrequency(float $milliseconds): void
+    {
+        $this->frequency = $milliseconds;
+    }
+}

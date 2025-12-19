@@ -1,0 +1,20 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Processes\Gates;
+
+use Flows\Gates\FuseGate;
+
+class <!--gate-name-->Gate extends FuseGate
+{
+    /**
+     * @return bool
+     */
+    public function __invoke(): bool {}
+
+    /**
+     * @param bool $forSerialization
+     */
+    public function cleanUp(bool $forSerialization = false): void {}
+}

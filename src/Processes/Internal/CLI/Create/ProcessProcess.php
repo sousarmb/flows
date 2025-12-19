@@ -7,30 +7,29 @@ namespace Flows\Processes\Internal\CLI\Create;
 use Collectibles\Contracts\IO as IOContract;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Processes\CLICommand;
-use Flows\Processes\Internal\CLI\CheckAppScaffoldExists;
+use Flows\Processes\Internal\CLI\CheckAppScaffoldExistsTask;
 use Flows\Processes\Internal\CLI\CheckForCommandFlagTask;
 use Flows\Processes\Internal\IO\CLICollection;
 use Flows\Processes\Internal\IO\CommandOutput;
-use Flows\Traits\ClassNameChecker;
+use Flows\Traits\ClassChecker;
 use InvalidArgumentException;
 use RuntimeException;
 
 class ProcessProcess extends CLICommand
 {
-    protected string $help = 'Create a new named process in the application processes directory.';
-
+    protected string $help = 'Create a named process in App/Processes';
     protected array $arguments = [
-        'name' => 'Process name',
-        'tasks' => 'Task list to be created (or included) in the new process (comma separated names)'
+        'name' => '=[name] Process class name',
+        'tasks' => '=[task1,task2] Task list to be included in the new process (comma separated names)'
     ];
 
     public function __construct()
     {
         $this->tasks = [
             CheckForCommandFlagTask::class,
-            CheckAppScaffoldExists::class,
+            CheckAppScaffoldExistsTask::class,
             new class implements TaskContract {
-                use ClassNameChecker;
+                use ClassChecker;
                 /**
                  * @param IOContract|CLICollection|null $io
                  * @return IOContract|null
@@ -38,45 +37,35 @@ class ProcessProcess extends CLICommand
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     echo PHP_EOL . 'Valid class names must obey regex ' . self::VALID_CLASS_REGEX . PHP_EOL . PHP_EOL;
-                    $processName = $io->get('argv.name');
-                    if ($processName) {
-                        if (!$this->isValid($processName)) {
+                    $name = $io->get('argv.name');
+                    if ($name) {
+                        if (!$this->classNameIsValid($name)) {
                             throw new InvalidArgumentException('Invalid string for process class name');
-                        } elseif ($this->processFileExists($io, $processName)) {
-                            throw new InvalidArgumentException('This process class name is already used');
+                        } elseif ($this->classFileExists($name, 'process', $io->getScaffoldDestinationDirectory())) {
+                            throw new InvalidArgumentException('Process class file exists');
                         }
-                        // Proceed to tasks
+
                         return $io;
                     }
                     // Query the user
                     $tryAgain = true;
                     do {
-                        $processName = readline('Process class name? ');
-                        if (!$this->isValid($processName)) {
+                        $name = readline('Process class name? ');
+                        if (!$this->classNameIsValid($name)) {
                             echo PHP_EOL . 'Invalid string for process class name' . PHP_EOL;
-                        } elseif ($this->processFileExists($io, $processName)) {
-                            echo PHP_EOL . 'This process class name is already used' . PHP_EOL;
+                        } elseif ($this->classFileExists($name, 'process', $io->getScaffoldDestinationDirectory())) {
+                            echo PHP_EOL . 'Process class file exists' . PHP_EOL;
                         } else {
                             $tryAgain = false;
                         }
                     } while ($tryAgain);
-                    return $io->set($processName, 'argv.name');
-                }
-
-                private function processFileExists(CLICollection $io, string $processName): bool
-                {
-                    $processFile = sprintf(
-                        '%sProcesses' . DIRECTORY_SEPARATOR . '%sProcess.php',
-                        $io->getScaffoldDestinationDirectory(),
-                        $processName
-                    );
-                    return file_exists($processFile);
+                    return $io->set($name, 'argv.name');
                 }
 
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                use ClassNameChecker;
+                use ClassChecker;
                 /**
                  * @param IOContract|CLICollection|null $io
                  * @return IOContract|null
@@ -86,16 +75,15 @@ class ProcessProcess extends CLICommand
                     if ($tasks = $io->get('argv.tasks')) {
                         $temp = [];
                         foreach (explode(',', $tasks) as $taskName) {
-                            if (!$this->isValid($taskName)) {
+                            if (!$this->classNameIsValid($taskName)) {
                                 throw new InvalidArgumentException('Invalid string for task class name');
-                            } elseif (class_exists("App\\Processes\\Tasks\\{$taskName}Task", false)) {
-                                throw new InvalidArgumentException('This task class name is already used');
+                            } elseif ($this->classFileExists($taskName, 'task', $io->getScaffoldDestinationDirectory())) {
+                                throw new InvalidArgumentException('Task class file exists');
                             } else {
                                 $temp[] = $taskName;
                             }
                         }
                         $io->set($temp, 'argv.tasks');
-                        // Proceed to create
                         return $io;
                     }
                     // Query the user
@@ -105,10 +93,10 @@ class ProcessProcess extends CLICommand
                         $taskName = readline('Add task named (or "---" to stop): ');
                         if ($taskName === '---') {
                             $another = false;
-                        } elseif (!$this->isValid($taskName)) {
+                        } elseif (!$this->classNameIsValid($taskName)) {
                             echo PHP_EOL . 'Invalid string for task class name' . PHP_EOL;
-                        } elseif (class_exists("App\\Processes\\Tasks\\{$taskName}Task", false)) {
-                            throw PHP_EOL . 'This task class name is already used' . PHP_EOL;
+                        } elseif ($this->classFileExists($taskName, 'task', $io->getScaffoldDestinationDirectory())) {
+                            throw PHP_EOL . 'Task class file exists' . PHP_EOL;
                         } else {
                             $io->add($taskName, 'argv.tasks');
                         }
@@ -129,26 +117,30 @@ class ProcessProcess extends CLICommand
                     $fileContents = file_get_contents($io->getScaffoldTemplatesDirectory() . "{$ds}process.php.template");
                     if ($io->has('argv.tasks')) {
                         $argvTasks = $io->get('argv.tasks');
+                        if (is_string($argvTasks)) {
+                            $argvTasks = [$argvTasks];
+                        }
+
                         $useList = $taskList = '';
                         foreach ($argvTasks as $task) {
-                            $useList .= "use App\\Processes\\Tasks\\{$task}::class;" . PHP_EOL;
+                            $useList .= "use App\\Processes\\Tasks\\{$task};" . PHP_EOL;
                             $taskList .= "\t\t\t{$task}::class," . PHP_EOL;
                         }
-                        $fileContents = preg_replace(
-                            ['/<!--use-list-->/', '/<!--task-list-->/'],
+                        $fileContents = str_replace(
+                            ['<!--use-list-->', '<!--task-list-->'],
                             [$useList, $taskList],
                             $fileContents
                         );
                     } else {
-                        $fileContents = preg_replace(
-                            ['/<!--use-list-->/', '/<!--task-list-->/'],
+                        $fileContents = str_replace(
+                            ['<!--use-list-->', '<!--task-list-->'],
                             '',
                             $fileContents
                         );
                     }
 
-                    $fileContents = preg_replace(
-                        '/<!--process-name-->/',
+                    $fileContents = str_replace(
+                        '<!--process-name-->',
                         $io->get('argv.name'),
                         $fileContents
                     );
@@ -162,7 +154,7 @@ class ProcessProcess extends CLICommand
                     }
 
                     return new CommandOutput(
-                        "Process created successfully {$processFile}",
+                        "Process created successfully [{$processFile}]",
                         true
                     );
                 }

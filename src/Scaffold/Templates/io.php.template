@@ -1,0 +1,10 @@
+<?php
+
+namespace App\Processes\IO;
+
+use Collectibles\IO;
+
+readonly class <!--io-name--> extends IO
+{
+    public function __construct() {}
+}

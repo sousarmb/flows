@@ -1,0 +1,18 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services\Providers;
+
+use App\Services\Contracts;
+use Flows\Attributes\Lazy;
+use Flows\Attributes\Singleton;
+use Flows\Container\Caller;
+use Flows\Contracts\Container\ServiceProvider;
+
+#[Lazy(<!--is-lazy-->)]
+#[Singleton(<!--is-singleton-->)]
+class <!--service-provider-name-->ServiceProvider implements ServiceProvider
+{
+    public function __invoke(?Caller $caller = null): Contracts\<!--return-contract-name-->Contract {}
+}
