@@ -9,7 +9,7 @@ use Flows\Attributes\Singleton;
 
 #[Lazy(<!--is-lazy-->)]
 #[Singleton(<!--is-singleton-->)]
-class <!--service-name-->Service 
+class <!--name-->Service 
 {
     public function __construct() {}
 }

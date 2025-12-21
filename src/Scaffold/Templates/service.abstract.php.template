@@ -6,7 +6,7 @@ namespace App\Services;
 
 use App\Services\Contracts;
 
-class <!--service-name-->Service implements Contracts\<!--implements-contract-->Contract
+class <!--name-->Service implements Contracts\<!--implements-contract-->Contract
 {
     public function __construct() {}
 }

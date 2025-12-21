@@ -73,7 +73,7 @@ class TaskProcess extends CLICommand
                     $ds = DIRECTORY_SEPARATOR;
                     $fileContents = file_get_contents($io->getScaffoldTemplatesDirectory() . "{$ds}task.php.template");
                     $fileContents = str_replace(
-                        '<!--task-name-->',
+                        '<!--name-->',
                         $io->get('argv.name'),
                         $fileContents
                     );

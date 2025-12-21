@@ -20,7 +20,7 @@ class GateProcess extends CLICommand
     protected string $help = 'Create a named gate class in App/Processes/Gates';
     protected array $arguments = [
         'name' => '=[name] Gate class name',
-        'type' => '=[And|Event|Fuse|OffloadAnd|UndoState|Xor]'
+        'type' => '=[and|event|fuse|offloadand|undostate|xor]'
     ];
 
     public function __construct()
@@ -40,8 +40,8 @@ class GateProcess extends CLICommand
                     $name = $io->get('argv.name');
                     if ($name) {
                         if (!$this->classNameIsValid($name)) {
-                            throw new InvalidArgumentException('Invalid string for Gate class name');
-                        } elseif ($this->classFileExists($name, 'task', $io->getScaffoldDestinationDirectory())) {
+                            throw new InvalidArgumentException('Invalid string for gate class name');
+                        } elseif ($this->classFileExists($name, 'gate', $io->getScaffoldDestinationDirectory())) {
                             throw new InvalidArgumentException('Gate class file exists');
                         }
 
@@ -104,7 +104,7 @@ class GateProcess extends CLICommand
                     $ds = DIRECTORY_SEPARATOR;
                     $fileContents = file_get_contents($io->getScaffoldTemplatesDirectory() . "{$ds}gate.{$io->get('argv.type')}.php.template");
                     $fileContents = str_replace(
-                        '<!--gate-name-->',
+                        '<!--name-->',
                         $io->get('argv.name'),
                         $fileContents
                     );

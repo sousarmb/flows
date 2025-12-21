@@ -163,7 +163,7 @@ class ObserverProcess extends CLICommand
                         $fileContents
                     );
                     $fileContents = str_replace(
-                        '<!--observer-name-->',
+                        '<!--name-->',
                         $io->get('argv.name'),
                         $fileContents
                     );

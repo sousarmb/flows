@@ -4,7 +4,7 @@ namespace App\Processes\IO;
 
 use Collectibles\IO;
 
-readonly class <!--io-name--> extends IO
+readonly class <!--name--> extends IO
 {
     public function __construct() {}
 }

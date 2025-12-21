@@ -8,7 +8,7 @@ namespace App\Observers;
 use Flows\Contracts\Observer;
 
 <!--handle-timing-attribute-->
-class <!--observer-name-->Observer implements Observer
+class <!--name-->Observer implements Observer
 {
     public function observe(object $subject): void {}
 }

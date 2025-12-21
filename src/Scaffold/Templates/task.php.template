@@ -5,7 +5,7 @@ namespace App\Processes\Tasks;
 use Collectibles\Contracts\IO as IOContract;
 use Flows\Contracts\Tasks\Task as TaskContract;
 
-class <!--task-name-->Task implements TaskContract
+class <!--name-->Task implements TaskContract
 {
     /**
      * @param IOContract|null $io

@@ -18,7 +18,7 @@ use RuntimeException;
 
 class ScaffoldProcess extends CLICommand
 {
-    protected string $help = 'Create application scaffold: necessary configuration files and directories to run an flows application';
+    protected string $help = 'Create application scaffold (necessary configuration files and directories to run an flows application)';
 
     public function __construct()
     {

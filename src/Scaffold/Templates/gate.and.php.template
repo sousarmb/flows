@@ -6,10 +6,10 @@ namespace App\Processes\Gates;
 
 use Flows\Gates\AndGate;
 
-class <!--gate-name-->Gate extends AndGate
+class <!--name-->Gate extends AndGate
 {
     /**
-     * @return array<int, string>
+     * @return array<int, string> Processes to run next
      */
     public function __invoke(): array
     {

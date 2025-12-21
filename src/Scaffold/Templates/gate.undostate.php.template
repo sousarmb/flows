@@ -6,10 +6,10 @@ namespace App\Processes\Gates;
 
 use Flows\Gates\UndoStateGate;
 
-class <!--gate-name-->Gate extends UndoStateGate
+class <!--name-->Gate extends UndoStateGate
 {
     /**
-     * @return int
+     * @return int Go back n savepoints in process
      */
     public function __invoke(): int {}
 

@@ -7,10 +7,10 @@ namespace App\Processes\Gates;
 use Flows\Gates\EventGate;
 use Flows\Gates\Events;
 
-class <!--gate-name-->Gate extends EventGate
+class <!--name-->Gate extends EventGate
 {
     /**
-     * @return string
+     * @return string Branch flow to this process
      */
     public function __invoke(): string
     {

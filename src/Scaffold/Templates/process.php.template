@@ -5,7 +5,7 @@ namespace App\Processes;
 use Flows\Processes\Process;
 <!--use-list-->
 
-class <!--process-name-->Process extends Process
+class <!--name-->Process extends Process
 {
     public function __construct()
     {

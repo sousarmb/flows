@@ -6,10 +6,10 @@ namespace App\Processes\Gates;
 
 use Flows\Gates\FuseGate;
 
-class <!--gate-name-->Gate extends FuseGate
+class <!--name-->Gate extends FuseGate
 {
     /**
-     * @return bool
+     * @return bool Stop flow
      */
     public function __invoke(): bool {}
 

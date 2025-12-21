@@ -15,7 +15,7 @@ use Flows\Traits\ClassChecker;
 use InvalidArgumentException;
 use RuntimeException;
 
-class TaskProcess extends CLICommand
+class IoProcess extends CLICommand
 {
     protected string $help = 'Create a named IO class in App/Processes/IO';
     protected array $arguments = [
@@ -73,7 +73,7 @@ class TaskProcess extends CLICommand
                     $ds = DIRECTORY_SEPARATOR;
                     $fileContents = file_get_contents($io->getScaffoldTemplatesDirectory() . "{$ds}io.php.template");
                     $fileContents = str_replace(
-                        '<!--io-name-->',
+                        '<!--name-->',
                         $io->get('argv.name'),
                         $fileContents
                     );

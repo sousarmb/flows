@@ -18,7 +18,7 @@ use RuntimeException;
 
 class ServiceProcess extends CLICommand
 {
-    protected string $help = 'Create and register a named service and/or service provider in App/Services';
+    protected string $help = 'Create and register a named service and/or service provider in App/Services and/or App/Services/Providers';
     protected array $arguments = [
         'name' => '=[name] Service class name',
         'lazy' => '=[no|yes] Lazy load service',
@@ -235,7 +235,7 @@ class ServiceProcess extends CLICommand
                     }
 
                     $fileContents = str_replace(
-                        '<!--service-name-->',
+                        '<!--name-->',
                         $io->get('argv.name'),
                         $fileContents
                     );

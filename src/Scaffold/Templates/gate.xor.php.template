@@ -6,10 +6,10 @@ namespace App\Processes\Gates;
 
 use Flows\Gates\XorGate;
 
-class <!--gate-name-->Gate extends XorGate
+class <!--name-->Gate extends XorGate
 {
     /**
-     * @return string
+     * @return string Branch flow to this process
      */
     public function __invoke(): string {}
 

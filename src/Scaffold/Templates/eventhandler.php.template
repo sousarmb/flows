@@ -9,7 +9,7 @@ use Flows\Contracts\EventHandler as EventHandlerContract;
 use Flows\Event\Event;
 
 <!--handle-timing-attribute-->
-class <!--event-handler-name-->EventHandler implements EventHandlerContract
+class <!--name-->EventHandler implements EventHandlerContract
 {
     public function handle(Event $event): void {}
 }

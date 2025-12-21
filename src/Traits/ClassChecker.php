@@ -38,6 +38,7 @@ trait ClassChecker
             'event' => "%sEvents{$ds}%sEvent.php",
             'eventhandler' => "%sEvents{$ds}Handlers{$ds}%sEvent.php",
             'gate' => "%sProcesses{$ds}Gates{$ds}%sGate.php",
+            'gateevent' => "%sEvents{$ds}%sGateEvent.php",
             'io' => "%sProcesses{$ds}IO{$ds}%sIO.php",
             'observer' => "%sObservers{$ds}%sObserver.php",
             'process' => "%sProcesses{$ds}%sProcess.php",

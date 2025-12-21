@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Flows\Processes\Internal\CLI\Create;
+namespace Flows\Processes\Internal\CLI\Create\Gate;
 
 use Collectibles\Contracts\IO as IOContract;
 use Flows\Contracts\Tasks\Task as TaskContract;
@@ -15,11 +15,12 @@ use Flows\Traits\ClassChecker;
 use InvalidArgumentException;
 use RuntimeException;
 
-class ContractProcess extends CLICommand
+class EventProcess extends CLICommand
 {
-    protected string $help = 'Create a named interface class in App/Services/Contracts';
+    protected string $help = 'Create a named gate event class in App/Events';
     protected array $arguments = [
-        'name' => '=[name] Interface class name',
+        'name' => '=[name] Gate event class name',
+        'type' => '=[frequent|stream]'
     ];
 
     public function __construct()
@@ -39,9 +40,9 @@ class ContractProcess extends CLICommand
                     $name = $io->get('argv.name');
                     if ($name) {
                         if (!$this->classNameIsValid($name)) {
-                            throw new InvalidArgumentException('Invalid string for interface class name');
-                        } elseif ($this->classFileExists($name, 'task', $io->getScaffoldDestinationDirectory())) {
-                            throw new InvalidArgumentException('Interface class file exists');
+                            throw new InvalidArgumentException('Invalid string for gate event class name');
+                        } elseif ($this->classFileExists($name, 'gateevent', $io->getScaffoldDestinationDirectory())) {
+                            throw new InvalidArgumentException('Gate event class file exists');
                         }
 
                         return $io;
@@ -49,11 +50,11 @@ class ContractProcess extends CLICommand
                     // Query the user
                     $tryAgain = true;
                     do {
-                        $name = readline('Interface class name? ');
+                        $name = readline('Gate class name? ');
                         if (!$this->classNameIsValid($name)) {
-                            echo PHP_EOL . 'Invalid string for interface class name' . PHP_EOL;
-                        } elseif ($this->classFileExists($name, 'contract', $io->getScaffoldDestinationDirectory())) {
-                            echo PHP_EOL . 'Interface class file exists' . PHP_EOL;
+                            echo PHP_EOL . 'Invalid string for gate event class name' . PHP_EOL;
+                        } elseif ($this->classFileExists($name, 'gateevent', $io->getScaffoldDestinationDirectory())) {
+                            echo PHP_EOL . 'Gate event class file exists' . PHP_EOL;
                         } else {
                             $tryAgain = false;
                         }
@@ -70,24 +71,54 @@ class ContractProcess extends CLICommand
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
+                    if ($type = $io->get('argv.type')) {
+                        if (!in_array($type, ['frequent', 'stream'])) {
+                            throw new InvalidArgumentException('Gate event type is: frequent|stream');
+                        }
+
+                        return $io;
+                    }
+                    // Query the user
+                    $tryAgain = true;
+                    do {
+                        $type = readline('Gate event type is frequent|stream? ');
+                        if (!in_array($type, ['frequent', 'stream'])) {
+                            echo PHP_EOL . 'Invalid gate event type ' . PHP_EOL;
+                        } else {
+                            $io->add($type, 'argv.type');
+                            $tryAgain = false;
+                        }
+                    } while ($tryAgain);
+                    return $io;
+                }
+
+                public function cleanUp(bool $forSerialization = false): void {}
+            },
+            new class implements TaskContract {
+                /**
+                 * @param IOContract|CLICollection|null $io
+                 * @return IOContract|null
+                 */
+                public function __invoke(?IOContract $io = null): ?IOContract
+                {
                     $ds = DIRECTORY_SEPARATOR;
-                    $fileContents = file_get_contents($io->getScaffoldTemplatesDirectory() . "{$ds}contract.php.template");
+                    $fileContents = file_get_contents($io->getScaffoldTemplatesDirectory() . "{$ds}gate.event.event.{$io->get('argv.type')}.php.template");
                     $fileContents = str_replace(
                         '<!--name-->',
                         $io->get('argv.name'),
                         $fileContents
                     );
-                    $contractFile = sprintf(
-                        "%sServices{$ds}Contracts{$ds}%sContract.php",
+                    $ioFile = sprintf(
+                        "%sProcesses{$ds}Gates{$ds}%sGate.php",
                         $io->getScaffoldDestinationDirectory(),
                         $io->get('argv.name')
                     );
-                    if (false === file_put_contents($contractFile, $fileContents)) {
-                        throw new RuntimeException("Could not write file {$contractFile}");
+                    if (false === file_put_contents($ioFile, $fileContents)) {
+                        throw new RuntimeException("Could not write file {$ioFile}");
                     }
 
                     return new CommandOutput(
-                        "Contract created successfully [{$contractFile}]",
+                        "Task created successfully [{$ioFile}]",
                         true
                     );
                 }

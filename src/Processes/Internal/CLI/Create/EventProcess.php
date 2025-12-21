@@ -80,7 +80,7 @@ class EventProcess extends CLICommand
                     $ds = DIRECTORY_SEPARATOR;
                     $fileContents = file_get_contents($io->getScaffoldTemplatesDirectory() . "{$ds}event.php.template");
                     $fileContents = str_replace(
-                        '<!--event-name-->',
+                        '<!--name-->',
                         $io->get('argv.name'),
                         $fileContents
                     );
@@ -128,7 +128,7 @@ class EventProcess extends CLICommand
                         $fileContents
                     );
                     $fileContents = str_replace(
-                        '<!--event-handler-name-->',
+                        '<!--name-->',
                         $io->get('argv.name'),
                         $fileContents
                     );

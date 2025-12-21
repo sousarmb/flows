@@ -140,7 +140,7 @@ class ProcessProcess extends CLICommand
                     }
 
                     $fileContents = str_replace(
-                        '<!--process-name-->',
+                        '<!--name-->',
                         $io->get('argv.name'),
                         $fileContents
                     );
