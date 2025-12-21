@@ -1,0 +1,12 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use App\Services\Contracts;
+
+class <!--name-->Service implements Contracts\<!--implements-contract-->Contract
+{
+    public function __construct() {}
+}

@@ -1,0 +1,35 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Events;
+
+use Flows\Contracts\Gates\Frequent as FrequentContract;
+use Flows\Contracts\Gates\GateEvent as GateEventContract;
+
+class <!--name-->GateEvent implements FrequentContract, GateEventContract
+{
+    public function __construct() {}
+
+    /**
+     * @param mixed $data 
+     * @return bool TRUE => event wins gate race condition; FALSE => try again in $frequency time
+     */
+    public function resolve($data = null): bool {}
+
+    /**
+     * @return float 
+     */
+    public function getFrequency(): float
+    {
+        return $this->frequency;
+    }
+
+    /**
+     * @param float $milliseconds Frequency to run resolve() and check if this gate event wins race condition
+     */
+    public function setFrequency(float $milliseconds): void
+    {
+        $this->frequency = $milliseconds;
+    }
+}

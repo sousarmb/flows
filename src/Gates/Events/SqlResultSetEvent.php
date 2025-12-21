@@ -11,7 +11,7 @@ use RuntimeException;
 
 /**
  * 
- * Event gate, run prepared statement every N seconds, resolves on result set size of 1 or more (column count)
+ * Event gate event, run prepared statement every N seconds, resolves on result set size of 1 or more (column count)
  */
 final readonly class SqlResultSetEvent implements FrequentContract, GateEventContract 
 {

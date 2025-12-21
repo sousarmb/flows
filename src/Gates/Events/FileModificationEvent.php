@@ -10,7 +10,7 @@ use LogicException;
 
 /**
  * 
- * Event gate, check every N seconds if a given file is modified (file size and modification time)
+ * Event gate event, check every N seconds if a given file is modified (file size and modification time)
  */
 final readonly class FileModificationEvent implements FrequentContract, GateEventContract 
 {

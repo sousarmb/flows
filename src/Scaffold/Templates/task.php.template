@@ -1,0 +1,17 @@
+<?php
+
+namespace App\Processes\Tasks;
+
+use Collectibles\Contracts\IO as IOContract;
+use Flows\Contracts\Tasks\Task as TaskContract;
+
+class <!--name-->Task implements TaskContract
+{
+    /**
+     * @param IOContract|null $io
+     * @return IOContract|null
+     */
+    public function __invoke(?IOContract $io = null): ?IOContract {}
+
+    public function cleanUp(bool $forSerialization = false): void {}
+}

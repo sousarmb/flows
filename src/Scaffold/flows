@@ -1,0 +1,140 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+use Flows\Contracts\CLICommand;
+use Flows\Processes\Internal\IO\CLICollection;
+
+require __DIR__ . '/../../vendor/autoload.php';
+
+define('FLOWS_COMMAND_CONTEXT', 0);
+
+function parseCommandArguments(array $argv): array
+{
+    if ([] === $argv) {
+        return $argv;
+    }
+
+    $temp = [];
+    foreach ($argv as $argumentValue) {
+        if ($equalPos =  strpos($argumentValue, '=')) {
+            $argument = trim(substr($argumentValue, 0, $equalPos));
+            $value = trim(substr($argumentValue, $equalPos + 1));
+            $temp[$argument] = $value;
+        } else {
+            $temp[trim($argumentValue)] = null;
+        }
+    }
+    return $temp;
+}
+
+function printArguments(CLICommand $process): void
+{
+    $arguments = $process->getArguments();
+    if ([] === $arguments) {
+        echo ' No command arguments' . PHP_EOL;
+    } else {
+        echo ' Command arguments:' . PHP_EOL;
+        foreach ($process->getArguments() as $k => $v) {
+            echo "  {$k}{$v}" . PHP_EOL;
+        }
+    }
+}
+
+function help(string $commandDirectory, ?string $showAs = null): void
+{
+    $ds = DIRECTORY_SEPARATOR;
+    $io = new CLICollection();
+    $src = $io->getPackageVendorDirectory() . "src{$ds}Processes{$ds}Internal{$ds}CLI{$ds}$commandDirectory";
+    foreach (glob("{$src}/*") as $directoryOrFile) {
+        if (in_array($directoryOrFile, ['.', '..'])) continue;
+        if (is_dir($directoryOrFile)) {
+            $directoryName = basename($directoryOrFile);
+            help("{$commandDirectory}{$ds}{$directoryName}", "{$commandDirectory}:{$directoryName}");
+            continue;
+        };
+
+        $fileName = basename($directoryOrFile);
+        $className = substr($fileName, 0, strpos($fileName, '.php'));
+        $commandDirectory = str_replace($ds, '\\', $commandDirectory);
+        $class = "Flows\\Processes\\Internal\\CLI\\{$commandDirectory}\\{$className}";
+        echo sprintf(
+            '%s%s:%s => ',
+            PHP_EOL,
+            strtolower($showAs ?? $commandDirectory),
+            strtolower(substr($className, 0, -7)),
+        );
+        $process = new $class;
+        echo $process->getHelp() . PHP_EOL;
+        printArguments($process);
+    }
+}
+
+function main(array $argv, int $argc): bool
+{
+    if (!isset($argv[1])) {
+        echo 'Available commands are:' . PHP_EOL;
+        help('Create');
+        return true;
+    }
+
+    $tmp = explode(':', strtolower($argv[1]), 3);
+    $count = count($tmp);
+    if (1 === $count) {
+        echo 'Available commands are:' . PHP_EOL;
+        help('Create');
+        return true;
+    }
+    if (3 === $count) {
+        list($command, $componentName, $processName) = $tmp;
+        $command = ucfirst(trim($command));
+        $componentName = ucfirst(trim($componentName));
+        $processName = ucfirst(trim($processName));
+        $process = sprintf('Flows\Processes\Internal\CLI\%s\%s\%sProcess', $command, $componentName, $processName);
+    } else {
+        list($command, $processName) = $tmp;
+        $command = ucfirst(trim($command));
+        $processName = ucfirst(trim($processName));
+        $process = sprintf('Flows\Processes\Internal\CLI\%s\%sProcess', $command, $processName);
+    }
+    if (!class_exists($process, true)) {
+        $message = $count === 3
+            ? "Invalid command {$command}:{$componentName}:{$processName}"
+            : "Invalid command {$command}:{$processName}";
+        throw new RuntimeException($message);
+    }
+
+    $process = new $process;
+    if (isset($argv[2]) && $argv[2] === 'help') {
+        echo $process->getHelp() . PHP_EOL;
+        printArguments($process);
+        return true;
+    }
+    // Check process arguments
+    $parsedArguments = parseCommandArguments(
+        array_slice($argv, 2, count($process->getArguments()))
+    );
+    if (!$process->checkArguments($parsedArguments)) {
+        echo PHP_EOL . 'Invalid arguments. Valid arguments:' . PHP_EOL;
+        printArguments($process);
+        return false;
+    }
+    // Run the process
+    $input = new CLICollection();
+    if ($argc > 2) {
+        $input->set($parsedArguments, 'argv');
+    }
+
+    $output = $process->run($input);
+    if (null === $output) {
+        echo PHP_EOL . 'Command output is null' . PHP_EOL;
+        return false;
+    }
+
+    echo PHP_EOL . 'Command output:' . PHP_EOL;
+    echo $output->get('message') . PHP_EOL . PHP_EOL;
+    return $output->get('success');
+}
+
+exit((int)main($argv, $argc));

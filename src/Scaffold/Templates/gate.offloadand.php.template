@@ -1,0 +1,23 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Processes\Gates;
+
+use Flows\Gates\OffloadAndGate;
+
+class <!--name-->Gate extends OffloadAndGate
+{
+    /**
+     * @return array<int, string> Processes to run next, in separate processes
+     */
+    public function __invoke(): array
+    {
+        return [];
+    }
+
+    /**
+     * @param bool $forSerialization
+     */
+    public function cleanUp(bool $forSerialization = false): void {}
+}

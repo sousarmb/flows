@@ -1,0 +1,14 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Observers;
+
+<!--use-attributes-list-->
+use Flows\Contracts\Observer;
+
+<!--handle-timing-attribute-->
+class <!--name-->Observer implements Observer
+{
+    public function observe(object $subject): void {}
+}
