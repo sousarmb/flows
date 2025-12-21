@@ -24,7 +24,11 @@ class OffloadProcess extends Process
     {
         $this->tasks = [
             new class implements TaskContract {
-                public function __invoke(?IOContract $io = null): ?IOContract 
+                /**
+                 * @param IOContract|Collection|null $io
+                 * @return IOContract|null
+                 */
+                public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     // change to OffloadedProcess.php script directory
                     if (!chdir(__DIR__ . '/../..')) {
@@ -40,7 +44,11 @@ class OffloadProcess extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IOContract $io = null): ?IOContract 
+                /**
+                 * @param IOContract|Collection|null $io
+                 * @return IOContract|null
+                 */
+                public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     $descriptorSpec = [
                         0 => ['pipe', 'r'], // STDIN (write to child process)
@@ -71,7 +79,11 @@ class OffloadProcess extends Process
 
                 private array $processes;
                 private bool $default_stop_on_offload_error = true;
-                public function __invoke(?IOContract $io = null): ?IOContract 
+                /**
+                 * @param IOContract|Collection|null $io
+                 * @return IOContract|null
+                 */
+                public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     $this->processes = $io->get('processes');
                     $output = new Collection();

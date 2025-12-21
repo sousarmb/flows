@@ -1,7 +1,7 @@
 {
     "name": "rsousa/flows",
     "description": "PHP application framework inspired on BPMN 1.0",
-    "type": "project",
+    "type": "library",
     "license": "MIT",
     "autoload": {
         "psr-4": {
@@ -22,5 +22,6 @@
     "require-dev": {
         "phpunit/phpunit": "^12.4",
         "squizlabs/php_codesniffer": "^4.0"
-    }
+    },
+    "bin": ["src/Scaffold/flows"]
 }

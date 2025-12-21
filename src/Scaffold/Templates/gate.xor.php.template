@@ -1,0 +1,20 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Processes\Gates;
+
+use Flows\Gates\XorGate;
+
+class <!--name-->Gate extends XorGate
+{
+    /**
+     * @return string Branch flow to this process
+     */
+    public function __invoke(): string {}
+
+    /**
+     * @param bool $forSerialization
+     */
+    public function cleanUp(bool $forSerialization = false): void {}
+}

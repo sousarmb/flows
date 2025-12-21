@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Flows\Contracts\Gates;
 
-interface PipeListener
+interface Stream
 {
     /**
-     * Get pipe to listen
+     * Get stream to listen
      */
-    public function getPipe(): mixed;
+    public function getStream(): mixed;
 }

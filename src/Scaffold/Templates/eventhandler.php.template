@@ -1,0 +1,15 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Events\Handlers;
+
+<!--use-attributes-list-->
+use Flows\Contracts\EventHandler as EventHandlerContract;
+use Flows\Event\Event;
+
+<!--handle-timing-attribute-->
+class <!--name-->EventHandler implements EventHandlerContract
+{
+    public function handle(Event $event): void {}
+}

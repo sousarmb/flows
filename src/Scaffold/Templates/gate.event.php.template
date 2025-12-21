@@ -1,0 +1,27 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Processes\Gates;
+
+use Flows\Gates\EventGate;
+use Flows\Gates\Events;
+
+class <!--name-->Gate extends EventGate
+{
+    /**
+     * @return string Branch flow to this process
+     */
+    public function __invoke(): string
+    {
+        $this->expires = 1;
+        $this->pushEvent();
+        $this->waitForEvent();
+        return $this->winner;
+    }
+
+    /**
+     * @param bool $forSerialization
+     */
+    public function cleanUp(bool $forSerialization = false): void {}
+}
