@@ -97,8 +97,8 @@ Flows PHP library can be used as a standalone tool to create your own applicatio
 - Service container
 
 ## Planned features:
-- Web event gates (planned, WIP)
 - Process serialization (planned, WIP)
+- HTTP message gate events (planned, WIP)
 
 ### Abstract and concrete object factory
 The factory creates objects using reflection. If other concrete classes are type hinted in the class constructor, they are injected into the new object. The factory can also retrieve dependencies from the service container.
@@ -131,7 +131,7 @@ Access flows features using the available facades:
 - `Logger` use to log events in the application log
 - `Observers` access to the observers kernel, use to manually register subjects and observer classes,  trigger observation.
 
-Facades are available in the `Flows\Facades` namespace and allow access to the actual services, not proxies. The actual services can also be type hinted in the task constructor.
+Facades are available in the `Flows\Facades` namespace and allow access to the actual services, not proxies. The actual services can also be type hinted in the process/task constructors.
 
 ### Gate, process and task observability
 Gates, processes and tasks are observed automatically (no need to write code for this) when registered in the `subject-observer.php` configuration file.
@@ -159,16 +159,16 @@ One of your processes needs an external action to complete: a record written in 
 
 If your business logic requires a process to wait until some condition happens, you can write an event gate to handle this case.
 
-Event gates [group conditions](https://github.com/sousarmb/flows-example-app/blob/main/App/Processes/Gates/WaitForFileModificationGate.php) that need to happen for a process to resume. The gate waits for one of multiple external conditions to resolve first, then branchs accordingly. 
+Event gates [group conditions](https://github.com/sousarmb/flows-example-app/blob/main/App/Processes/Gates/WaitForFileModificationGate.php) that need to happen for a process to resume. The gate waits for one of multiple external conditions to resolve first (`$winner` member), then branchs accordingly. 
 
 You write the gate event classes.
 
-A wait timeout for the gate is always set. If no event resolves during this timeout, a default branch must be selected. Think of it as a switch default.
+A wait timeout (`$expires` member) for the gate is always set. If no event resolves during this timeout, a default branch must be selected. Think of it as a switch default.
 
 ### Save/Undo process state
 Sometimes things go wrong. If this happens it's possible to return the current process to a previous state and resume from there.
 
- How? Place process savepoints between tasks and then [write undo state gates](https://github.com/sousarmb/flows-example-app/blob/main/App/Processes/StateChangeWithSaveAndUndoProcess.php) to evaluate if the process needs to go back to a previous state and resume from there.
+ How? Place process savepoints (`Flows\Processes\Sign\SaveState` class) between tasks and then [write undo state gates](https://github.com/sousarmb/flows-example-app/blob/main/App/Processes/StateChangeWithSaveAndUndoProcess.php) to evaluate if the process needs to go back to a previous state and resume from there.
 
 ### Service container
 The service container stores objects that can be injected by the factory when creating class instances, as object dependencies.
