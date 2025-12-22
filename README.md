@@ -152,7 +152,7 @@ The "parent" process is paused while waiting for the "child" processes to comple
 When the child process complete, their output is collected and the parent process is given it, to pass resume and pass it to the next task.
 
 ### Process serialization (WIP)
-Process and task classes implement `__sleep()` and `__wakeup()` to allow serialization. In theory a workflow can be "frozen" in time to be stored in a database and resumed at any later time. Still work in progress.
+Process and task classes implement `__sleep()` and `__wakeup()` to allow serialization. In theory a workflow can be "frozen" in time to be stored in a database, reloaded and resumed at any later time. Work in progress.
 
 ### React to external events
 One of your processes needs an external action to complete: a record written in a database table, a mail to arrive, a filesystem file updated, etc. 
