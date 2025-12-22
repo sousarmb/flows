@@ -1,6 +1,6 @@
 {
     "name": "rsousa/flows",
-    "description": "PHP application framework inspired on BPMN 1.0",
+    "description": "A lightweight, BPMN-inspired workflow engine for PHP 8.1+",
     "type": "library",
     "license": "MIT",
     "autoload": {
@@ -15,7 +15,7 @@
         }
     ],
     "require": {
-        "php": ">=8.4",
+        "php": ">=8.1",
         "monolog/monolog": "^3.9",
         "rsousa/collectibles": "^1.4"
     },
