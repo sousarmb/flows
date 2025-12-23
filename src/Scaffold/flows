@@ -46,7 +46,7 @@ function help(string $commandDirectory, ?string $showAs = null): void
 {
     $ds = DIRECTORY_SEPARATOR;
     $io = new CLICollection();
-    $src = $io->getPackageVendorDirectory() . "src{$ds}Processes{$ds}Internal{$ds}CLI{$ds}$commandDirectory";
+    $src = $io->getPackageVendorDirectory() . "{$ds}src{$ds}Processes{$ds}Internal{$ds}CLI{$ds}$commandDirectory";
     foreach (glob("{$src}/*") as $directoryOrFile) {
         if (in_array($directoryOrFile, ['.', '..'])) continue;
         if (is_dir($directoryOrFile)) {
