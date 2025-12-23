@@ -98,7 +98,7 @@ class ProcessProcess extends CLICommand
                         } elseif ($this->classFileExists($taskName, 'task', $io->getScaffoldDestinationDirectory())) {
                             throw PHP_EOL . 'Task class file exists' . PHP_EOL;
                         } else {
-                            $io->add($taskName, 'argv.tasks');
+                            $io->add("{$taskName}Task", 'argv.tasks');
                         }
                     } while ($another);
                     return $io;

@@ -13,16 +13,12 @@ class CLICollection extends Collection
     {
         parent::__construct();
         $ds = DIRECTORY_SEPARATOR;
-        $packageVendorAndName = InstalledVersions::getRootPackage()['name'];
-        $this->set($packageVendorAndName, 'package');
-        [$vendor, $package] = explode('/', $packageVendorAndName);
-        $this->set($vendor, 'package_vendor');
-        $this->set($package, 'package_name');
-        $this->set($vendorDir = InstalledVersions::getInstallPath($packageVendorAndName), 'package_vendor_directory');
-        $this->set("{$vendorDir}src{$ds}Scaffold{$ds}App{$ds}", 'scaffold_source_directory');
-        $this->set($rootDirectory = dirname($vendorDir, 7) . $ds, 'root_directory');
-        $this->set("{$rootDirectory}App{$ds}", 'scaffold_destination_directory');
-        $this->set("{$vendorDir}src{$ds}Scaffold{$ds}Templates{$ds}", 'scaffold_templates_directory');
+        $this->set($packageVendorAndName = 'rsousa/flows', 'package');
+        $this->set($package_vendor_directory = InstalledVersions::getInstallPath($packageVendorAndName), 'package_vendor_directory');
+        $this->set($projectDirectory = "{$package_vendor_directory}{$ds}..{$ds}..{$ds}..{$ds}", 'project_directory');
+        $this->set("{$projectDirectory}App{$ds}", 'scaffold_destination_directory');
+        $this->set("{$package_vendor_directory}{$ds}src{$ds}Scaffold{$ds}App{$ds}", 'scaffold_source_directory');
+        $this->set("{$package_vendor_directory}{$ds}src{$ds}Scaffold{$ds}Templates{$ds}", 'scaffold_templates_directory');
     }
 
     public function getArgv(): array|null
@@ -35,16 +31,6 @@ class CLICollection extends Collection
         return $this->get('package');
     }
 
-    public function getPackageVendor(): string
-    {
-        return $this->get('package_vendor');
-    }
-
-    public function getPackageName(): string
-    {
-        return $this->get('package_name');
-    }
-
     public function getPackageVendorDirectory(): string
     {
         return $this->get('package_vendor_directory');
@@ -53,11 +39,6 @@ class CLICollection extends Collection
     public function getScaffoldSourceDirectory(): string
     {
         return $this->get('scaffold_source_directory');
-    }
-
-    public function getRootDirectory(): string
-    {
-        return $this->get('root_directory');
     }
 
     public function getScaffoldDestinationDirectory(): string
