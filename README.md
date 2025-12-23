@@ -25,8 +25,10 @@ php App/demo-branch-xor-gate.php
 
 ## New project
 ```bash
-composer create-project rsousa/flows my-new-project
+mkdir my-new-project
 cd my-new-project
+composer init
+composer require rsousa/flows
 php vendor/bin/flows create:scaffold
 ```
 
