@@ -345,9 +345,9 @@ Services are instantiated [only when needed](https://github.com/sousarmb/flows-e
 Class is instantiated [only once](https://github.com/sousarmb/flows-example-app/blob/main/App/Services/DateService.php). When type-hinted for injection or retrieved from the container, the same instance is returned every time.
 # Documentation
 For now, explore:
-- The example app
-- Source code in `src/` (heavily commented)
-- The core Process class: https://github.com/sousarmb/flows/blob/dev/src/Processes/Process.php
+- The [example application](https://github.com/sousarmb/flows-example-app)
+- Source code in [`src/`](https://github.com/sousarmb/flows/tree/main/src) (heavily commented)
+- The core [`Process` class](https://github.com/sousarmb/flows/blob/dev/src/Processes/Process.php)
 ## Status
 Early development (work in progress). The core is stable and usable. Some planned features are not ready yet.
 # That's it
