@@ -39,7 +39,7 @@ Run the process branching with XOR gate demo with:
 ```bash
 php App/demo-branch-xor-gate.php
 ```
-Try the other demos in the `App` directory.
+Try the other demos in the [`App`](https://github.com/sousarmb/flows-example-app/tree/main/App) directory.
 # Installation
 This package can be installed as a [Composer](https://getcomposer.org/) dependency with:
 ```bash
