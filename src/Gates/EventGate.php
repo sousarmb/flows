@@ -7,6 +7,7 @@ namespace Flows\Gates;
 use Flows\Contracts\Gates\Frequent as FrequentContract;
 use Flows\Contracts\Gates\GateEvent as GateEventContract;
 use Flows\Contracts\Gates\Stream as StreamContract;
+use Flows\Gates\Events\HttpEvent;
 use Flows\Gates\Gate;
 use Flows\Reactor\Reactor;
 use LogicException;
@@ -109,4 +110,15 @@ abstract class EventGate extends Gate
      * @return string The chosen path
      */
     abstract public function __invoke(): string;
+
+    /**
+     * 
+     * Wether this event gate has any HTTP events?
+     * 
+     * @return bool TRUE => yes, FALSE => no
+     */
+    public function hasHttpGateEvents(): bool
+    {
+        return (bool)count(array_filter($this->events, fn($evt) => $evt instanceof HttpEvent));
+    }
 }
