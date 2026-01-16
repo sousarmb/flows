@@ -19,7 +19,6 @@ Flows PHP library can be used as a standalone tool to create your own applicatio
 - [Service container](#service-container)
 ## Planned features:
 - [Process serialization (planned, WIP)](#process-serialization-wip)
-- HTTP message gate events (planned, WIP)
 ## Live Demo
 See it in action right now:  
 https://github.com/sousarmb/flows-example-app  
