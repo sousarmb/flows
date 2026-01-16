@@ -23,5 +23,5 @@
         "phpunit/phpunit": "^12.4",
         "squizlabs/php_codesniffer": "^4.0"
     },
-    "bin": ["src/Scaffold/flows"]
+    "bin": ["src/Scaffold/flows", "src/Helpers/HttpServer/http-server"]
 }

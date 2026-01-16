@@ -8,6 +8,7 @@ use Collectibles\Collection;
 use Collectibles\Contracts\IO as IOContract;
 use Flows\Container\Container;
 use Flows\Event\Kernel as EventKernel;
+use Flows\Exceptions\HttpServerRunningException;
 use Flows\Facades\Config;
 use Flows\Facades\Logger;
 use Flows\Gates\AndGate;
@@ -19,6 +20,7 @@ use Flows\Processes\Internal\BootProcess;
 use Flows\Processes\Internal\Events\ApplicationFullStop;
 use Flows\Processes\Internal\IO\OffloadedIO;
 use Flows\Processes\Internal\OffloadProcess;
+use Flows\Processes\Internal\StartHttpServerProcess;
 use Flows\Registries\ProcessRegistry;
 use LogicException;
 use SplStack;
@@ -61,7 +63,7 @@ class ApplicationKernel
                 // resume process
                 $nsProcess = get_class($process);
                 $gateOrReturn = $process->resume(
-                    // with fresh input (output from previous process(es)
+                    // with fresh input (output from previous process(es))
                     $collection->getAsCollection($nsProcess)
                 );
                 if (!$keepOutput) {
@@ -76,6 +78,18 @@ class ApplicationKernel
                 if (!static::isOffloadedProcess()) {
                     // Only one process in offloaded processes, no need for extra work
                     $this->completedProcesses[] = $process;
+                }
+                if (
+                    $gateOrReturn instanceof EventGate
+                    && $gateOrReturn->hasHttpGateEvents()
+                ) {
+                    try {
+                        // Start HTTP server
+                        (new StartHttpServerProcess())->run($io);
+                    } catch (HttpServerRunningException $e) {
+                        // Already running, carry on
+                    }
+                    // Other exceptions will be caught elsewhere (or not)
                 }
                 // Move to the next process
                 $this->stack->push([
@@ -221,5 +235,16 @@ class ApplicationKernel
     public static function fullStop(): void
     {
         static::$fullStop = true;
+    }
+
+    /**
+     * 
+     * Get UUID for this flows execution
+     * 
+     * @return string Generated from cryptographically secure random bytes
+     */
+    public static function getInstanceUUID(): string
+    {
+        return INSTANCE_UUID;
     }
 }
