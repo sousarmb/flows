@@ -30,6 +30,7 @@ use Flows\Factory;
 use Flows\Helpers\StdErrMonologHandler;
 use Flows\Observer\Kernel as ObserverKernel;
 use Flows\Processes\Process;
+use Flows\Traits\RandomString;
 use LogicException;
 use Monolog\ErrorHandler;
 use Monolog\Formatter\LineFormatter;
@@ -44,12 +45,18 @@ class BootProcess extends Process
     {
         $this->tasks = [
             new class implements TaskContract {
+                use RandomString;
                 /**
                  * @param IOContract|Collection|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
+                    /**
+                     * 
+                     * UUID for this flows execution
+                     */
+                    define('INSTANCE_UUID', $this->getHexadecimal(32));
                     return new Collection();
                 }
 
@@ -62,13 +69,14 @@ class BootProcess extends Process
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
+                    $ds = DIRECTORY_SEPARATOR;
                     $packageName = InstalledVersions::getRootPackage()['name'];
                     $vendorDir = InstalledVersions::getInstallPath($packageName);
                     // Where is the code?
-                    $root_dir = dirname($vendorDir, 4) . '/';
-                    $application_dir = $root_dir . 'App/';
-                    $config_dir = $application_dir . 'Config/';
-                    $log_dir = $application_dir . 'Logs/';
+                    $root_dir = dirname($vendorDir, 4) . $ds;
+                    $application_dir = $root_dir . "App{$ds}";
+                    $config_dir = $application_dir . "Config{$ds}";
+                    $log_dir = $application_dir . "Logs{$ds}";
                     $files = [
                         'app.php',
                         'service-provider.php',
