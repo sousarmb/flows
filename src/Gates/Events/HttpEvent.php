@@ -9,7 +9,6 @@ use Flows\Contracts\Gates\Stream as StreamContract;
 use Flows\Facades\Config;
 use Flows\Facades\Logger;
 use Flows\Traits\RandomString;
-use LogicException;
 use RuntimeException;
 
 /**
@@ -53,10 +52,17 @@ abstract readonly class HttpEvent implements GateEventContract, StreamContract
     /**
      * 
      * Register gate event with HTTP server
+     * 
+     * @throws RuntimeException If unable to open command pipe file or register paths with HTTP server
      */
     private function registerPathWithHttpServer(): void
     {
-        $commandPipe = fopen(Config::getApplicationSettings()->get('http.server.command_pipe_path'), 'w');
+        $commandPipeFile = Config::getApplicationSettings()->get('http.server.command_pipe_path');
+        $commandPipe = fopen($commandPipeFile, 'w');
+        if (false === $commandPipe) {
+            throw new RuntimeException("Could not open command pipe to HTTP server: {$commandPipeFile}");
+        }
+
         stream_set_blocking($commandPipe, false);
         $command = json_encode([
             'command' => 'REGISTER',
@@ -67,7 +73,7 @@ abstract readonly class HttpEvent implements GateEventContract, StreamContract
             'allowed_methods' => $this->allowedMethods,
         ]);
         if (false === fwrite($commandPipe, $command . PHP_EOL)) {
-            throw new RuntimeException("Could not register command: {$command}");
+            throw new RuntimeException("Could not register path: {$command}");
         }
 
         fclose($commandPipe);
@@ -78,11 +84,11 @@ abstract readonly class HttpEvent implements GateEventContract, StreamContract
      * 
      * Create streams to communicate with HTTP server: one to send messages, one to receive
      * 
-     * @throws LogicException If streams already set
+     * @throws RuntimeException If unable to create/open communication streams with the HTTP server
      */
     private function createStreams(): void
     {
-        $temp = sys_get_temp_dir();
+        $temp = sys_get_temp_dir() . DIRECTORY_SEPARATOR;
         $this->fromServerPipe = $temp . $this->getHexadecimal(8, 'flows-');
         $this->toServerPipe = $temp . $this->getHexadecimal(8, 'flows-');
         if (false === posix_mkfifo($this->fromServerPipe, 664)) {
@@ -101,6 +107,10 @@ abstract readonly class HttpEvent implements GateEventContract, StreamContract
         Logger::info("Created pipes: {$this->fromServerPipe} {$this->toServerPipe}");
     }
 
+    /**
+     * 
+     * Close the streams used for communication between the HTTP server and this process
+     */
     public function closeStreams(): void
     {
         if (is_resource($this->fromServerStream)) {
@@ -110,6 +120,8 @@ abstract readonly class HttpEvent implements GateEventContract, StreamContract
             fclose($this->toServerStream);
         }
 
+        @unlink($this->fromServerPipe);
+        @unlink($this->toServerPipe);
         Logger::info("Closed pipes: {$this->fromServerPipe} {$this->toServerPipe}");
     }
 
@@ -132,5 +144,10 @@ abstract readonly class HttpEvent implements GateEventContract, StreamContract
         // This stream will be passed to resolve() when a request that matches 
         // criteria (path + method(s)) arrives on the HTTP server
         return $this->fromServerStream;
+    }
+
+    public function __destruct()
+    {
+        $this->closeStreams();
     }
 }

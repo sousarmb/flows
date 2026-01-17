@@ -79,19 +79,21 @@ class ApplicationKernel
                     // Only one process in offloaded processes, no need for extra work
                     $this->completedProcesses[] = $process;
                 }
-                if (
-                    $gateOrReturn instanceof EventGate
-                    && $gateOrReturn->hasHttpGateEvents()
-                ) {
-                    try {
+                if ($gateOrReturn instanceof EventGate) {
+                    $gateOrReturn->registerEvents();
+                    if ($gateOrReturn->hasHttpEvents()) {
                         // Start HTTP server
-                        (new StartHttpServerProcess())->run($io);
-                    } catch (HttpServerRunningException $e) {
-                        // Already running, carry on
+                        $startHttpServerProcess = new StartHttpServerProcess();
+                        try {
+                            $startHttpServerProcess->run();
+                        } catch (HttpServerRunningException $e) {
+                            // Already running, carry on
+                        }
+                        $startHttpServerProcess->cleanUp();
                     }
-                    // Other exceptions will be caught elsewhere (or not)
                 }
-                // Move to the next process
+                // Branch flow
+                $gateOrReturn->waitForEvent();
                 $this->stack->push([
                     $this->processes->getNamed($gateOrReturn()),
                     // With previous process output

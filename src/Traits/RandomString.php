@@ -13,7 +13,7 @@ trait RandomString
     ): string {
         $string = bin2hex(random_bytes($length));
         if ($prefix) {
-            $string = "{$prefix}{$suffix}";
+            $string = "{$prefix}{$string}";
         }
         if ($suffix) {
             $string .= $suffix;

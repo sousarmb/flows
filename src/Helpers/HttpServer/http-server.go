@@ -472,7 +472,7 @@ func (m *DynamicMux) Deregister(path string) {
 
 func watchHandlers(ctx context.Context, mux *DynamicMux, server *http.Server, cancel context.CancelFunc) {
 	// Allow time to register handlers
-	time.Sleep(time.Second)
+	time.Sleep(3 * time.Second)
 	// Start checking handlers
 	for {
 		select {
@@ -506,7 +506,8 @@ func watchHandlers(ctx context.Context, mux *DynamicMux, server *http.Server, ca
 				server.Shutdown(ctx)
 			}
 		}
-		time.Sleep(333 * time.Millisecond)
+		// Take it easy on the CPU
+		time.Sleep(33 * time.Millisecond)
 	}
 }
 
@@ -515,6 +516,8 @@ func watchHandlers(ctx context.Context, mux *DynamicMux, server *http.Server, ca
  */
 
 func watchPipe(ctx context.Context, mux *DynamicMux, pipePath *string) {
+	// Allow time to register handlers
+	time.Sleep(time.Second)
 	f, err := os.OpenFile(*pipePath, os.O_RDONLY, 0664)
 	if err != nil {
 		log.Println("Pipe open error: ", err)
@@ -560,6 +563,8 @@ func watchPipe(ctx context.Context, mux *DynamicMux, pipePath *string) {
 				return
 			}
 		}
+		// Take it easy on the CPU
+		time.Sleep(33 * time.Millisecond)
 	}
 }
 

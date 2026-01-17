@@ -33,17 +33,15 @@ class StartHttpServerProcess extends Process
                     }
 
                     $ds = DIRECTORY_SEPARATOR;
-                    $packageName = InstalledVersions::getRootPackage()['name'];
-                    $vendorDir = InstalledVersions::getInstallPath($packageName);
-                    $binDir = "{$vendorDir}{$ds}bin";
-                    // change to HTTP server runtime directory
-                    if (!chdir($binDir)) {
-                        throw new RuntimeException('Could not change to HTTP server runtime directory');
+                    $packageDir = InstalledVersions::getInstallPath(FLOWS_PACKAGE_NAME);
+                    $binDir = dirname($packageDir, 4) . "{$ds}bin";
+                    if (false === chdir($binDir)) {
+                        throw new RuntimeException("Could not change to HTTP server runtime directory: {$binDir}");
                     }
-                    if (!is_executable('http-server')) {
+                    if (false === is_executable('http-server')) {
                         throw new RuntimeException('HTTP server runtime not executable');
                     }
-                    if (!posix_mkfifo($commandPipe, 0664)) {
+                    if (false === posix_mkfifo($commandPipe, 0664)) {
                         throw new RuntimeException("Could not create command pipe file: {$commandPipe}");
                     }
 
@@ -65,10 +63,10 @@ class StartHttpServerProcess extends Process
                         2 => ['file', Config::getLogDirectory() . 'http-server.log', 'a'], // STDERR
                     ];
                     $settings = Config::getApplicationSettings();
-                    $port = $settings()->get('http.server.listen_on');
-                    $commandPipe = $settings()->get('http.server.command_pipe_path');
+                    $port = $settings->get('http.server.listen_on');
+                    $commandPipe = $settings->get('http.server.command_pipe_path');
                     $httpServer = proc_open(
-                        ['./http-server', '--port', $port, '--pipe-file', $commandPipe],
+                        ['./http-server', '--port', $port, '--command-pipe-path', $commandPipe],
                         $descriptorSpec,
                         $pipes,
                         getcwd()
@@ -76,6 +74,8 @@ class StartHttpServerProcess extends Process
                     if (false === $httpServer) {
                         throw new CouldNotStartHttpServerException();
                     }
+
+                    sleep(1);
 
                     Logger::info("Started HTTP server on port {$port} with command pipe {$commandPipe}");
                     return $io;

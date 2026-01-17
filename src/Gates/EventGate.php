@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Flows\Gates;
 
+use Flows\Contracts\Gates\EventGate as EventGateContract;
 use Flows\Contracts\Gates\Frequent as FrequentContract;
 use Flows\Contracts\Gates\GateEvent as GateEventContract;
 use Flows\Contracts\Gates\Stream as StreamContract;
@@ -16,16 +17,18 @@ use LogicException;
  * 
  * Choose path to take based on events and data
  */
-abstract class EventGate extends Gate
+abstract class EventGate extends Gate implements EventGateContract
 {
     /**
-     * @var array<int, GateEvent> Events to be resolved
+     * @var array<int, GateEventContract> Events to be resolved
      */
-    protected array $events = [];
+    private array $events = [];
+
     /**
      * @var int Wait this many seconds for event resolution, when expired take default process
      */
     protected int $expires = 1;
+
     /**
      * @var GateEvent|null The first event to resolve successfully (or null if none)
      */
@@ -50,7 +53,7 @@ abstract class EventGate extends Gate
      * 
      * @throws LogicException When no events are set to wait on
      */
-    protected function waitForEvent(): void
+    public function waitForEvent(): void
     {
         if ([] === $this->events) {
             throw new LogicException('No events set to wait on');
@@ -112,13 +115,45 @@ abstract class EventGate extends Gate
     abstract public function __invoke(): string;
 
     /**
+     * Get gate time out 
+     * 
+     * @return int Second(s)
+     */
+    public function getTimeout(): int
+    {
+        return $this->expires;
+    }
+
+    /**
+     * 
+     * Wether this event gate has any frequent events?
+     * 
+     * @return bool TRUE => yes, FALSE => no
+     */
+    public function hasFrequentEvents(): bool
+    {
+        return (bool)count(array_filter($this->events, fn($evt) => $evt instanceof FrequentContract));
+    }
+
+    /**
      * 
      * Wether this event gate has any HTTP events?
      * 
      * @return bool TRUE => yes, FALSE => no
      */
-    public function hasHttpGateEvents(): bool
+    public function hasHttpEvents(): bool
     {
-        return (bool)count(array_filter($this->events, fn($evt) => $evt instanceof HttpEvent));
+        return (bool)count(array_filter($this->events, fn($evt) => is_subclass_of($evt, HttpEvent::class)));
+    }
+
+    /**
+     * 
+     * Wether this event gate has any stream events?
+     * 
+     * @return bool TRUE => yes, FALSE => no
+     */
+    public function hasStreamEvents(): bool
+    {
+        return (bool)count(array_filter($this->events, fn($evt) => $evt instanceof StreamContract));
     }
 }

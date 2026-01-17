@@ -52,6 +52,7 @@ class BootProcess extends Process
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
+                    define('FLOWS_PACKAGE_NAME', 'rsousa/flows');
                     /**
                      * 
                      * UUID for this flows execution
@@ -70,10 +71,9 @@ class BootProcess extends Process
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     $ds = DIRECTORY_SEPARATOR;
-                    $packageName = InstalledVersions::getRootPackage()['name'];
-                    $vendorDir = InstalledVersions::getInstallPath($packageName);
                     // Where is the code?
-                    $root_dir = dirname($vendorDir, 4) . $ds;
+                    $package_dir = InstalledVersions::getInstallPath(FLOWS_PACKAGE_NAME);
+                    $root_dir = dirname($package_dir, 5) . $ds;
                     $application_dir = $root_dir . "App{$ds}";
                     $config_dir = $application_dir . "Config{$ds}";
                     $log_dir = $application_dir . "Logs{$ds}";

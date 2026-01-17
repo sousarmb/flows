@@ -1,0 +1,38 @@
+<?php
+
+declare(strict_types=1);
+
+namespace App\Events;
+
+use Flows\Gates\Events\HttpEvent;
+
+readonly class <!--name-->GateEvent extends HttpEvent
+{
+    public function __construct()
+    {
+        $this->path = // '/some/url/path';
+        $this->methods = // ['GET', 'DELETE'];
+    }
+
+    /**
+     *
+     * Resolve is called when data is available on the stream 
+     * 
+     * @param mixed $data Stream whith the request (JSON encoded) data the HTTP server received
+     * @return bool TRUE => event wins gate race condition; FALSE => try again when data available on the $data stream
+     */
+    public function resolve($data = null): bool {
+        /**
+         * $data is the stream where the HTTP server writes
+         * Example usage:
+         * 
+         * $json = json_decode(fgets($data));
+         * if ($json['some_key'] === 'good data') {
+         *   fwrite($this->toServerStream, 'ok');
+         *   return true;
+         * }
+         *
+         * return false;
+         */
+    }
+}
