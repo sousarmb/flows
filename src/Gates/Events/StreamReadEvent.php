@@ -22,4 +22,16 @@ abstract readonly class StreamReadEvent implements GateEventContract, StreamCont
     {
         return $this->stream;
     }
+
+    public function closeStream(): void
+    {
+        if (is_resource($this->stream)) {
+            fclose($this->stream);
+        }
+    }
+
+    public function __destruct()
+    {
+        $this->closeStream();
+    }
 }

@@ -10,6 +10,7 @@ readonly class <!--name-->GateEvent extends HttpEvent
 {
     public function __construct()
     {
+        $this->timeout = // 30; // seconds
         $this->path = // '/some/url/path';
         $this->methods = // ['GET', 'DELETE'];
     }
@@ -18,7 +19,7 @@ readonly class <!--name-->GateEvent extends HttpEvent
      *
      * Resolve is called when data is available on the stream 
      * 
-     * @param mixed $data Stream whith the request (JSON encoded) data the HTTP server received
+     * @param resource $data Stream whith the request (JSON encoded) data the HTTP server received
      * @return bool TRUE => event wins gate race condition; FALSE => try again when data available on the $data stream
      */
     public function resolve($data = null): bool {
@@ -26,12 +27,17 @@ readonly class <!--name-->GateEvent extends HttpEvent
          * $data is the stream where the HTTP server writes
          * Example usage:
          * 
-         * $json = json_decode(fgets($data));
-         * if ($json['some_key'] === 'good data') {
-         *   fwrite($this->toServerStream, 'ok');
-         *   return true;
+         * $temp = fgets($data);
+         * $json = json_decode($temp, true);
+         * if (
+         *     array_key_exists('data', $json)
+         *     && $json['data'] === 'good data'
+         * ) {
+         *    $this->accepted(200, "Accepted", "Flow is going to resume");
+         *    return true;
          * }
          *
+         * $this->tryAgain(400, "Bad data", "");
          * return false;
          */
     }

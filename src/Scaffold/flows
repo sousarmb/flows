@@ -6,7 +6,8 @@ declare(strict_types=1);
 use Flows\Contracts\CLICommand;
 use Flows\Processes\Internal\IO\CLICollection;
 
-require __DIR__ . '/../../../../autoload.php';
+$ds = DIRECTORY_SEPARATOR;
+require __DIR__ . "{$ds}..{$ds}..{$ds}..{$ds}..{$ds}autoload.php";
 
 define('FLOWS_COMMAND_CONTEXT', 0);
 

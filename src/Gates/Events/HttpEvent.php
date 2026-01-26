@@ -8,6 +8,7 @@ use Flows\Contracts\Gates\GateEvent as GateEventContract;
 use Flows\Contracts\Gates\Stream as StreamContract;
 use Flows\Facades\Config;
 use Flows\Facades\Logger;
+use Flows\Helpers\ResponseMessageToHttpRequest;
 use Flows\Traits\RandomString;
 use RuntimeException;
 
@@ -19,13 +20,20 @@ abstract readonly class HttpEvent implements GateEventContract, StreamContract
 {
     use RandomString;
 
+    const TIMEOUT = 600; // 5 minutes
+
     /**
-     * @var string $fromServerPipe
+     * @var resource
+     */
+    private mixed $streamFilter;
+
+    /**
+     * @var string $fromServerPipe File path
      */
     private string $fromServerPipe;
 
     /**
-     * @var string $toServerPipe
+     * @var string $toServerPipe File path
      */
     private string $toServerPipe;
 
@@ -42,12 +50,17 @@ abstract readonly class HttpEvent implements GateEventContract, StreamContract
     /**
      * @var resource $fromServerStream Receive messages from HTTP server here
      */
-    protected mixed $fromServerStream;
+    private mixed $fromServerStream;
 
     /**
      * @var resource $toServerStream Send messages to HTTP server here
      */
-    protected mixed $toServerStream;
+    private mixed $toServerStream;
+
+    /**
+     * @var int $timeout In seconds, how long the HTTP server keeps this resource, default is TIMEOUT seconds
+     */
+    protected int $timeout;
 
     /**
      * 
@@ -63,20 +76,27 @@ abstract readonly class HttpEvent implements GateEventContract, StreamContract
             throw new RuntimeException("Could not open command pipe to HTTP server: {$commandPipeFile}");
         }
 
-        stream_set_blocking($commandPipe, false);
+        // stream_set_blocking($commandPipe, false);
         $command = json_encode([
             'command' => 'REGISTER',
             'path' => $this->path,
-            'pipe_to' => $this->toServerStream, // resolve() must write to this stream for a response to be sent from the server
-            'pipe_from' => $this->fromServerStream, // the reactor reads this stream
-            'external_process_id' => INSTANCE_UUID,
+            // The HTTP server writes to this stream
+            'pipe_from' => $this->fromServerPipe,
+            /**
+             * This external program writes to this stream; 
+             * resolve() must write to this stream for a response to be sent from the HTTP server
+             */
+            'pipe_to' => $this->toServerPipe,
+            'external_process_id' => INSTANCE_UID,
             'allowed_methods' => $this->allowedMethods,
+            'timeout' => isset($this->timeout) ? $this->timeout : self::TIMEOUT
         ]);
-        if (false === fwrite($commandPipe, $command . PHP_EOL)) {
+        $write = fwrite($commandPipe, "{$command}\n");
+        fclose($commandPipe);
+        if (false === $write) {
             throw new RuntimeException("Could not register path: {$command}");
         }
 
-        fclose($commandPipe);
         Logger::info("Registered path: {$this->path}");
     }
 
@@ -89,40 +109,48 @@ abstract readonly class HttpEvent implements GateEventContract, StreamContract
     private function createStreams(): void
     {
         $temp = sys_get_temp_dir() . DIRECTORY_SEPARATOR;
-        $this->fromServerPipe = $temp . $this->getHexadecimal(8, 'flows-');
-        $this->toServerPipe = $temp . $this->getHexadecimal(8, 'flows-');
-        if (false === posix_mkfifo($this->fromServerPipe, 664)) {
+        $this->fromServerPipe = $temp . $this->getHexadecimal(8, 'flows-from-server-pipe-');
+        if (!posix_mkfifo($this->fromServerPipe, 0664)) {
             throw new RuntimeException("Could not create pipe file: {$this->fromServerPipe}");
         }
+
+        Logger::info("Created pipe: {$this->fromServerPipe}");
         if (false === $this->fromServerStream = fopen($this->fromServerPipe, 'r+')) {
+            @unlink($this->fromServerPipe);
             throw new RuntimeException("Could not open pipe file: {$this->fromServerPipe}");
         }
-        if (false === posix_mkfifo($this->toServerPipe, 664)) {
+
+        $this->toServerPipe = $temp . $this->getHexadecimal(8, 'flows-to-server-pipe-');
+        if (!posix_mkfifo($this->toServerPipe, 0664)) {
             throw new RuntimeException("Could not create pipe file: {$this->toServerPipe}");
         }
+
+        Logger::info("Created pipe: {$this->toServerPipe}");
         if (false === $this->toServerStream = fopen($this->toServerPipe, 'w+')) {
+            @unlink($this->toServerPipe);
             throw new RuntimeException("Could not open pipe file: {$this->toServerPipe}");
         }
 
-        Logger::info("Created pipes: {$this->fromServerPipe} {$this->toServerPipe}");
+        stream_set_blocking($this->fromServerStream, false);
+        stream_set_blocking($this->toServerStream, false);
     }
 
     /**
      * 
      * Close the streams used for communication between the HTTP server and this process
      */
-    public function closeStreams(): void
+    public function closeStream(): void
     {
-        if (is_resource($this->fromServerStream)) {
+        if (isset($this->fromServerStream) && is_resource($this->fromServerStream)) {
             fclose($this->fromServerStream);
+            @unlink($this->fromServerPipe);
+            Logger::info("Closed pipe: {$this->fromServerPipe}");
         }
-        if (is_resource($this->toServerStream)) {
+        if (isset($this->toServerStream) && is_resource($this->toServerStream)) {
             fclose($this->toServerStream);
+            @unlink($this->toServerPipe);
+            Logger::info("Closed pipe: {$this->toServerPipe}");
         }
-
-        @unlink($this->fromServerPipe);
-        @unlink($this->toServerPipe);
-        Logger::info("Closed pipes: {$this->fromServerPipe} {$this->toServerPipe}");
     }
 
     /**
@@ -148,6 +176,44 @@ abstract readonly class HttpEvent implements GateEventContract, StreamContract
 
     public function __destruct()
     {
-        $this->closeStreams();
+        $this->closeStream();
+    }
+
+    /**
+     * Message that represents success to resume flow. Client must not retry to access this resource.
+     * 
+     * @param int $code Custom code
+     * @param string $status Custom status
+     * @param string $message Custom message
+     * @throws RuntimeException If unable to send message to HTTP server
+     */
+    public function accepted(
+        int $code,
+        string $status,
+        mixed $message
+    ): void {
+        $response = new ResponseMessageToHttpRequest(true, $code, $status, $message);
+        if (false === fwrite($this->toServerStream, json_encode($response) . "\n")) {
+            throw new RuntimeException("Could not write to HTTP server stream");
+        }
+    }
+
+    /**
+     * Message that represents failure to resume flow. Client must try again with another request.
+     * 
+     * @param int $code Custom code
+     * @param string $status Custom status
+     * @param string $message Custom message
+     * @throws RuntimeException If unable to send message to HTTP server
+     */
+    public function tryAgain(
+        int $code,
+        string $status,
+        string $message
+    ): void {
+        $response = new ResponseMessageToHttpRequest(false, $code, $status, $message);
+        if (false === fwrite($this->toServerStream, json_encode($response) . "\n")) {
+            throw new RuntimeException("Could not write to HTTP server stream");
+        }
     }
 }

@@ -13,6 +13,8 @@ use Flows\Exceptions\HttpServerRunningException;
 use Flows\Facades\Config;
 use Flows\Facades\Logger;
 use Flows\Processes\Process;
+use Flows\Traits\Echos;
+use Flows\Traits\RandomString;
 use RuntimeException;
 
 class StartHttpServerProcess extends Process
@@ -21,36 +23,53 @@ class StartHttpServerProcess extends Process
     {
         $this->tasks = [
             new class implements TaskContract {
+                use Echos;
                 /**
                  * @param IOContract|Collection|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
-                    $commandPipe = Config::getApplicationSettings()->get('http.server.command_pipe_path');
-                    if (file_exists($commandPipe)) {
+                    if ($this->echoLocalHttpServer()) {
+                        Logger::info('HTTP server running');
                         throw new HttpServerRunningException();
                     }
 
                     $ds = DIRECTORY_SEPARATOR;
                     $packageDir = InstalledVersions::getInstallPath(FLOWS_PACKAGE_NAME);
                     $binDir = dirname($packageDir, 4) . "{$ds}bin";
-                    if (false === chdir($binDir)) {
+                    if (!chdir($binDir)) {
                         throw new RuntimeException("Could not change to HTTP server runtime directory: {$binDir}");
                     }
-                    if (false === is_executable('http-server')) {
-                        throw new RuntimeException('HTTP server runtime not executable');
+                    if (
+                        !is_readable('http-server')
+                        || !is_executable('http-server')
+                    ) {
+                        throw new RuntimeException('HTTP server runtime not found, not readable or not executable');
                     }
-                    if (false === posix_mkfifo($commandPipe, 0664)) {
+
+                    $commandPipe = Config::getApplicationSettings()->get('http.server.command_pipe_path');
+                    @unlink($commandPipe); // fresh start
+                    if (!posix_mkfifo($commandPipe, 0664)) {
                         throw new RuntimeException("Could not create command pipe file: {$commandPipe}");
                     }
 
                     return $io;
                 }
 
-                public function cleanUp(bool $forSerialization = false): void {}
+                public function cleanUp(bool $forSerialization = false): void
+                {
+                    if (
+                        !$forSerialization
+                        && !chdir(STARTER_DIRECTORY)
+                    ) {
+                        throw new RuntimeException('Could not change directory to starter directory');
+                    }
+                }
             },
             new class implements TaskContract {
+                use Echos;
+                use RandomString;
                 /**
                  * @param IOContract|Collection|null $io
                  * @return IOContract|null
@@ -65,19 +84,30 @@ class StartHttpServerProcess extends Process
                     $settings = Config::getApplicationSettings();
                     $port = $settings->get('http.server.listen_on');
                     $commandPipe = $settings->get('http.server.command_pipe_path');
+                    $externalProcessReadTimeout = $settings->get('http.server.timeout_read_external_process');
+                    $uid = $this->getHexadecimal(32);
                     $httpServer = proc_open(
-                        ['./http-server', '--port', $port, '--command-pipe-path', $commandPipe],
+                        [
+                            './http-server',
+                            '--port',
+                            $port,
+                            '--command-pipe-path',
+                            $commandPipe,
+                            '--server-instance-uid',
+                            $uid,
+                            '--timeout-read-external-process',
+                            $externalProcessReadTimeout
+                        ],
                         $descriptorSpec,
                         $pipes,
                         getcwd()
                     );
                     if (false === $httpServer) {
+                        @unlink($commandPipe);
                         throw new CouldNotStartHttpServerException();
                     }
 
-                    sleep(1);
-
-                    Logger::info("Started HTTP server on port {$port} with command pipe {$commandPipe}");
+                    Logger::info("Started HTTP server on port {$port} with command pipe {$commandPipe}, unique identifier {$uid}");
                     return $io;
                 }
 

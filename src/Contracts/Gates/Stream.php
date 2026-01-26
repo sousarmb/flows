@@ -10,4 +10,9 @@ interface Stream
      * Get stream to listen
      */
     public function getStream(): mixed;
+
+    /**
+     * Close open stream(s)
+     */
+    public function closeStream(): void;
 }

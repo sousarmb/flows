@@ -247,6 +247,6 @@ class ApplicationKernel
      */
     public static function getInstanceUUID(): string
     {
-        return INSTANCE_UUID;
+        return INSTANCE_UID;
     }
 }

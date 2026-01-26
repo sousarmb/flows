@@ -93,6 +93,7 @@ abstract class EventGate extends Gate implements EventGateContract
                     $event->getStream(),
                     function ($stream, $reactor) use ($event) {
                         if ($event->resolve($stream)) {
+                            $event->closeStream();
                             $reactor->stopRun();
                             $this->winner = $event;
                         }
