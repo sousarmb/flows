@@ -7,6 +7,7 @@ namespace Flows\Gates;
 use Flows\Contracts\Gates\EventGate as EventGateContract;
 use Flows\Contracts\Gates\Frequent as FrequentContract;
 use Flows\Contracts\Gates\GateEvent as GateEventContract;
+use Flows\Contracts\Gates\HttpEvent as HttpEventContract;
 use Flows\Contracts\Gates\Stream as StreamContract;
 use Flows\Gates\Events\HttpEvent;
 use Flows\Gates\Gate;
@@ -35,7 +36,6 @@ abstract class EventGate extends Gate implements EventGateContract
     protected ?GateEventContract $winner = null;
 
     /**
-     * 
      * Add to list of events that trigger gate resolution
      * 
      * @param GateEventContract $event
@@ -48,7 +48,6 @@ abstract class EventGate extends Gate implements EventGateContract
     }
 
     /**
-     * 
      * Start reactor to assert conditions set by gate events
      * 
      * @throws LogicException When no events are set to wait on
@@ -85,15 +84,32 @@ abstract class EventGate extends Gate implements EventGateContract
                     true
                 );
             } elseif (
+                $event instanceof HttpEventContract
+                && $event instanceof StreamContract
+                && $event instanceof GateEventContract
+            ) {
+                $reactor->onReadable(
+                    $event->getResource(),
+                    function ($reactor) use ($event) {
+                        $client = $event->acceptClient();
+                        $data = fgets($client);
+                        if ($event->resolve($data)) {
+                            $event->closeResource();
+                            $reactor->stopRun();
+                            $this->winner = $event;
+                        }
+                    }
+                );
+            } elseif (
                 $event instanceof StreamContract
                 && $event instanceof GateEventContract
             ) {
-                stream_set_blocking($event->getStream(), false);
+                stream_set_blocking($event->getResource(), false);
                 $reactor->onReadable(
-                    $event->getStream(),
+                    $event->getResource(),
                     function ($stream, $reactor) use ($event) {
                         if ($event->resolve($stream)) {
-                            $event->closeStream();
+                            $event->closeResource();
                             $reactor->stopRun();
                             $this->winner = $event;
                         }
@@ -105,7 +121,6 @@ abstract class EventGate extends Gate implements EventGateContract
     }
 
     /**
-     * 
      * Wait for one of many events to resolve or take default path if none does.
      * Use data to help in the path choice.
      * Must call waitForEvent() to start race condition between gate events, winner 
@@ -126,7 +141,6 @@ abstract class EventGate extends Gate implements EventGateContract
     }
 
     /**
-     * 
      * Wether this event gate has any frequent events?
      * 
      * @return bool TRUE => yes, FALSE => no
@@ -137,8 +151,8 @@ abstract class EventGate extends Gate implements EventGateContract
     }
 
     /**
-     * 
      * Wether this event gate has any HTTP events?
+     * Used by the kernel to start HTTP handler server before gate usage
      * 
      * @return bool TRUE => yes, FALSE => no
      */
@@ -148,7 +162,6 @@ abstract class EventGate extends Gate implements EventGateContract
     }
 
     /**
-     * 
      * Wether this event gate has any stream events?
      * 
      * @return bool TRUE => yes, FALSE => no

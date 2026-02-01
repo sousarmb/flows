@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Flows\Gates\Events;
 
 use Flows\Contracts\Gates\GateEvent as GateEventContract;
+use Flows\Contracts\Gates\HttpEvent as HttpEventContract;
 use Flows\Contracts\Gates\Stream as StreamContract;
 use Flows\Facades\Config;
 use Flows\Facades\Logger;
 use Flows\Helpers\ResponseMessageToHttpRequest;
+use Flows\Traits\Files;
 use Flows\Traits\RandomString;
 use RuntimeException;
 
@@ -16,26 +18,17 @@ use RuntimeException;
  * 
  * Event gate event, process HTTP requests received by helper HTTP server
  */
-abstract readonly class HttpEvent implements GateEventContract, StreamContract
+abstract class HttpEvent implements GateEventContract, HttpEventContract, StreamContract
 {
     use RandomString;
+    use Files;
 
     const TIMEOUT = 600; // 5 minutes
 
     /**
-     * @var resource
+     * @var string $handlerSrvSockFile Socket file path
      */
-    private mixed $streamFilter;
-
-    /**
-     * @var string $fromServerPipe File path
-     */
-    private string $fromServerPipe;
-
-    /**
-     * @var string $toServerPipe File path
-     */
-    private string $toServerPipe;
+    private string $handlerSrvSockFile;
 
     /**
      * @var string $path
@@ -48,14 +41,14 @@ abstract readonly class HttpEvent implements GateEventContract, StreamContract
     protected array $allowedMethods;
 
     /**
-     * @var resource $fromServerStream Receive messages from HTTP server here
+     * @var resource $handlerSrvSock Server to handle relayed requests from the HTTP handler server
      */
-    private mixed $fromServerStream;
+    private mixed $handlerSrvSock;
 
     /**
-     * @var resource $toServerStream Send messages to HTTP server here
+     * @var resource $client The HTTP handler server client request to relay the HTTP request it received
      */
-    private mixed $toServerStream;
+    private mixed $client;
 
     /**
      * @var int $timeout In seconds, how long the HTTP server keeps this resource, default is TIMEOUT seconds
@@ -63,157 +56,176 @@ abstract readonly class HttpEvent implements GateEventContract, StreamContract
     protected int $timeout;
 
     /**
-     * 
-     * Register gate event with HTTP server
+     * Register event/resource with HTTP server
+     * Creates and binds to command (comms) socket where HTTP server listens to commands
      * 
      * @throws RuntimeException If unable to open command pipe file or register paths with HTTP server
      */
-    private function registerPathWithHttpServer(): void
+    private function registerPathWithHandlerServer(): void
     {
-        $commandPipeFile = Config::getApplicationSettings()->get('http.server.command_pipe_path');
-        $commandPipe = fopen($commandPipeFile, 'w');
-        if (false === $commandPipe) {
-            throw new RuntimeException("Could not open command pipe to HTTP server: {$commandPipeFile}");
+        $cmdSockFile = Config::getApplicationSettings()->get('http.server.command_socket_path');
+        $sock = socket_create(AF_UNIX, SOCK_STREAM, 0);
+        if (!$sock) {
+            throw new RuntimeException("Socket create fail: {$cmdSockFile}");
         }
-
-        // stream_set_blocking($commandPipe, false);
-        $command = json_encode([
+        // Wait for handler server to create file (but not forever)
+        $this->waitForFile($cmdSockFile);
+        if (!@socket_connect($sock, $cmdSockFile)) {
+            $msg = sprintf(
+                'Socket connect %s fail: %s',
+                $cmdSockFile,
+                socket_strerror(socket_last_error($sock))
+            );
+            throw new RuntimeException($msg);
+        }
+        // This socket is used for PHP <-> Handler server communications
+        $temp = sys_get_temp_dir() . DIRECTORY_SEPARATOR;
+        $this->handlerSrvSockFile = $temp . $this->getHexadecimal(8, 'flows-', '.sock');
+        @unlink($this->handlerSrvSockFile);
+        // Register resource
+        $cmd = json_encode([
             'command' => 'REGISTER',
             'path' => $this->path,
-            // The HTTP server writes to this stream
-            'pipe_from' => $this->fromServerPipe,
-            /**
-             * This external program writes to this stream; 
-             * resolve() must write to this stream for a response to be sent from the HTTP server
-             */
-            'pipe_to' => $this->toServerPipe,
+            'socket_file' => $this->handlerSrvSockFile,
             'external_process_id' => INSTANCE_UID,
             'allowed_methods' => $this->allowedMethods,
             'timeout' => isset($this->timeout) ? $this->timeout : self::TIMEOUT
-        ]);
-        $write = fwrite($commandPipe, "{$command}\n");
-        fclose($commandPipe);
-        if (false === $write) {
-            throw new RuntimeException("Could not register path: {$command}");
+        ]) . "\n";
+        $len = strlen($cmd);
+        $sent = socket_write($sock, $cmd, $len);
+        if (false === $sent) {
+            $msg = sprintf(
+                'Error reading response from handler server: %s',
+                socket_strerror(socket_last_error($sock))
+            );
+            throw new RuntimeException($msg);
+        } elseif ($sent < $len) {
+            throw new RuntimeException('Could not send whole command message to handler server');
+        }
+
+        $resp = socket_read($sock, 4096);
+        socket_close($sock);
+        if ($resp === false) {
+            $msg = sprintf(
+                'Error reading response from handler server: %s',
+                socket_strerror(socket_last_error($sock))
+            );
+            throw new RuntimeException($msg);
+        }
+        if (!json_validate($resp)) {
+            $msg = sprintf('Invalid JSON response from handler server: %s', json_last_error_msg());
+            throw new RuntimeException($msg);
+        }
+
+        $resp = json_decode($resp, true);
+        if (!$resp['ok']) {
+            throw new RuntimeException("Could not register path {$this->path}: {$resp['error']}");
         }
 
         Logger::info("Registered path: {$this->path}");
     }
 
     /**
+     * Create a server so the handler server can relay requests it receives
      * 
-     * Create streams to communicate with HTTP server: one to send messages, one to receive
-     * 
-     * @throws RuntimeException If unable to create/open communication streams with the HTTP server
+     * @throws RuntimeException If unable to create server
      */
-    private function createStreams(): void
+    private function createServerForRequestRelay(): void
     {
-        $temp = sys_get_temp_dir() . DIRECTORY_SEPARATOR;
-        $this->fromServerPipe = $temp . $this->getHexadecimal(8, 'flows-from-server-pipe-');
-        if (!posix_mkfifo($this->fromServerPipe, 0664)) {
-            throw new RuntimeException("Could not create pipe file: {$this->fromServerPipe}");
+        // Remove old socket
+        if (file_exists($this->handlerSrvSockFile)) {
+            @unlink($this->handlerSrvSockFile);
         }
-
-        Logger::info("Created pipe: {$this->fromServerPipe}");
-        if (false === $this->fromServerStream = fopen($this->fromServerPipe, 'r+')) {
-            @unlink($this->fromServerPipe);
-            throw new RuntimeException("Could not open pipe file: {$this->fromServerPipe}");
+        // Create Unix domain socket server
+        $this->handlerSrvSock = stream_socket_server(
+            "unix://{$this->handlerSrvSockFile}",
+            $errno,
+            $errstr,
+            STREAM_SERVER_BIND | STREAM_SERVER_LISTEN
+        );
+        if (!$this->handlerSrvSock) {
+            throw new RuntimeException("Server creation failed: $errstr ($errno)\n");
         }
-
-        $this->toServerPipe = $temp . $this->getHexadecimal(8, 'flows-to-server-pipe-');
-        if (!posix_mkfifo($this->toServerPipe, 0664)) {
-            throw new RuntimeException("Could not create pipe file: {$this->toServerPipe}");
-        }
-
-        Logger::info("Created pipe: {$this->toServerPipe}");
-        if (false === $this->toServerStream = fopen($this->toServerPipe, 'w+')) {
-            @unlink($this->toServerPipe);
-            throw new RuntimeException("Could not open pipe file: {$this->toServerPipe}");
-        }
-
-        stream_set_blocking($this->fromServerStream, false);
-        stream_set_blocking($this->toServerStream, false);
+        // Non-blocking server socket
+        stream_set_blocking($this->handlerSrvSock, false);
     }
 
     /**
-     * 
-     * Close the streams used for communication between the HTTP server and this process
+     * Close and remove socket used for communication with HTTP server
      */
-    public function closeStream(): void
+    public function closeResource(): void
     {
-        if (isset($this->fromServerStream) && is_resource($this->fromServerStream)) {
-            fclose($this->fromServerStream);
-            @unlink($this->fromServerPipe);
-            Logger::info("Closed pipe: {$this->fromServerPipe}");
-        }
-        if (isset($this->toServerStream) && is_resource($this->toServerStream)) {
-            fclose($this->toServerStream);
-            @unlink($this->toServerPipe);
-            Logger::info("Closed pipe: {$this->toServerPipe}");
+        if (
+            isset($this->handlerSrvSock)
+            && is_resource($this->handlerSrvSock)
+        ) {
+            fclose($this->handlerSrvSock);
+            @unlink($this->handlerSrvSockFile);
+            Logger::info("Closed socket: {$this->handlerSrvSockFile}");
         }
     }
 
     /**
-     * 
-     * Get the stream the HTTP server writes to when a request is received.
-     * If communication pipes don't exist create them.
+     * Get the socket the HTTP server writes to when a request is received.
+     * If communication socket doesn't exist create it.
      * 
      * @return resource 
      */
-    public function getStream(): mixed
+    public function getResource(): mixed
     {
         if (
-            !isset($this->fromServerStream)
-            && !isset($this->toServerStream)
+            !isset($this->handlerSrvSockFile)
+            || !isset($this->handlerSrvSock)
         ) {
-            $this->createStreams();
-            $this->registerPathWithHttpServer();
+            $this->registerPathWithHandlerServer();
+            $this->createServerForRequestRelay();
         }
         // This stream will be passed to resolve() when a request that matches 
         // criteria (path + method(s)) arrives on the HTTP server
-        return $this->fromServerStream;
+        return $this->handlerSrvSock;
     }
 
     public function __destruct()
     {
-        $this->closeStream();
+        $this->closeResource();
     }
 
-    /**
-     * Message that represents success to resume flow. Client must not retry to access this resource.
-     * 
-     * @param int $code Custom code
-     * @param string $status Custom status
-     * @param string $message Custom message
-     * @throws RuntimeException If unable to send message to HTTP server
-     */
     public function accepted(
         int $code,
         string $status,
         mixed $message
-    ): void {
-        $response = new ResponseMessageToHttpRequest(true, $code, $status, $message);
-        if (false === fwrite($this->toServerStream, json_encode($response) . "\n")) {
-            throw new RuntimeException("Could not write to HTTP server stream");
+    ): bool {
+        $resp = new ResponseMessageToHttpRequest(true, $code, $status, $message);
+        if (false === fwrite($this->client, json_encode($resp) . "\n")) {
+            $this->closeResource();
+            throw new RuntimeException("Could not write \"accepted\" message to handler server");
         }
+
+        fflush($this->client);
+        return true;
     }
 
-    /**
-     * Message that represents failure to resume flow. Client must try again with another request.
-     * 
-     * @param int $code Custom code
-     * @param string $status Custom status
-     * @param string $message Custom message
-     * @throws RuntimeException If unable to send message to HTTP server
-     */
     public function tryAgain(
         int $code,
         string $status,
-        string $message
-    ): void {
-        $response = new ResponseMessageToHttpRequest(false, $code, $status, $message);
-        if (false === fwrite($this->toServerStream, json_encode($response) . "\n")) {
-            throw new RuntimeException("Could not write to HTTP server stream");
+        mixed $message
+    ): bool {
+        $resp = new ResponseMessageToHttpRequest(false, $code, $status, $message);
+        if (false === fwrite($this->client, json_encode($resp) . "\n")) {
+            $this->closeResource();
+            throw new RuntimeException("Could not write \"try again\" message to handler server");
         }
+
+        fflush($this->client);
+        return false;
+    }
+
+    public function acceptClient(): mixed
+    {
+        if (false === $this->client = stream_socket_accept($this->handlerSrvSock)) {
+            throw new RuntimeException('Unable to accept client');
+        }
+
+        return $this->client;
     }
 }

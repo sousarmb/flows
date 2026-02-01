@@ -5,13 +5,25 @@ declare(strict_types=1);
 namespace Flows\Traits;
 
 use Flows\Facades\Config;
+use InvalidArgumentException;
 
 trait Echos
 {
-    public function echoLocalHttpServer(): bool
+    /**
+     * Check if HTTP handler server is running
+     * 
+     * @param string $address IP address plus port, protocol is always HTTP, defaults to configuration "http.server.address" value
+     * @throws InvalidArgumentException If providded address is not valid
+     * @return bool TRUE => server reachable, FALSE => server not reachable
+     */
+    public function pingHandlerServer(?string $address = null): bool
     {
-        $urlEcho = sprintf('http://127.0.0.1:%s/echo', Config::getApplicationSettings()->get('http.server.listen_on'));
-        $ch = curl_init($urlEcho);
+        $urlPing = sprintf("http://%s/ping", $address ?? Config::getApplicationSettings()->get('http.server.address'));
+        if (false === filter_var($urlPing, FILTER_VALIDATE_URL)) {
+            throw new InvalidArgumentException('Invalid URL for HTTP handler server');
+        }
+
+        $ch = curl_init($urlPing);
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($ch);

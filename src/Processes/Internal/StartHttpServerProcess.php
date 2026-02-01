@@ -30,7 +30,7 @@ class StartHttpServerProcess extends Process
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
-                    if ($this->echoLocalHttpServer()) {
+                    if ($this->pingHandlerServer()) {
                         Logger::info('HTTP server running');
                         throw new HttpServerRunningException();
                     }
@@ -48,12 +48,8 @@ class StartHttpServerProcess extends Process
                         throw new RuntimeException('HTTP server runtime not found, not readable or not executable');
                     }
 
-                    $commandPipe = Config::getApplicationSettings()->get('http.server.command_pipe_path');
-                    @unlink($commandPipe); // fresh start
-                    if (!posix_mkfifo($commandPipe, 0664)) {
-                        throw new RuntimeException("Could not create command pipe file: {$commandPipe}");
-                    }
-
+                    $cmdSocketPath = Config::getApplicationSettings()->get('http.server.command_socket_path');
+                    @unlink($cmdSocketPath); // fresh start
                     return $io;
                 }
 
@@ -82,18 +78,18 @@ class StartHttpServerProcess extends Process
                         2 => ['file', Config::getLogDirectory() . 'http-server.log', 'a'], // STDERR
                     ];
                     $settings = Config::getApplicationSettings();
-                    $port = $settings->get('http.server.listen_on');
-                    $commandPipe = $settings->get('http.server.command_pipe_path');
+                    $address = $settings->get('http.server.listen_on');
+                    $cmdSocketPath = $settings->get('http.server.command_socket_path');
                     $externalProcessReadTimeout = $settings->get('http.server.timeout_read_external_process');
                     $uid = $this->getHexadecimal(32);
                     $httpServer = proc_open(
                         [
                             './http-server',
-                            '--port',
-                            $port,
-                            '--command-pipe-path',
-                            $commandPipe,
-                            '--server-instance-uid',
+                            '--address',
+                            $address,
+                            '--command-socket',
+                            $cmdSocketPath,
+                            '--server-uid',
                             $uid,
                             '--timeout-read-external-process',
                             $externalProcessReadTimeout
@@ -103,11 +99,11 @@ class StartHttpServerProcess extends Process
                         getcwd()
                     );
                     if (false === $httpServer) {
-                        @unlink($commandPipe);
+                        @unlink($cmdSocketPath);
                         throw new CouldNotStartHttpServerException();
                     }
 
-                    Logger::info("Started HTTP server on port {$port} with command pipe {$commandPipe}, unique identifier {$uid}");
+                    Logger::info("Started HTTP server on address {$address} with command socket {$cmdSocketPath}, unique identifier {$uid}");
                     return $io;
                 }
 
