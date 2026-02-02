@@ -94,7 +94,6 @@ abstract class EventGate extends Gate implements EventGateContract
                         $client = $event->acceptClient();
                         $data = fgets($client);
                         if ($event->resolve($data)) {
-                            $event->closeResource();
                             $reactor->stopRun();
                             $this->winner = $event;
                         }
@@ -109,7 +108,6 @@ abstract class EventGate extends Gate implements EventGateContract
                     $event->getResource(),
                     function ($stream, $reactor) use ($event) {
                         if ($event->resolve($stream)) {
-                            $event->closeResource();
                             $reactor->stopRun();
                             $this->winner = $event;
                         }
@@ -118,6 +116,15 @@ abstract class EventGate extends Gate implements EventGateContract
             }
         }
         $reactor->run();
+    }
+
+    public function cleanUp(bool $forSerialization = false): void
+    {
+        foreach ($this->events as $event) {
+            if ($event instanceof StreamContract) {
+                $event->closeResource();
+            }
+        }
     }
 
     /**

@@ -9,7 +9,7 @@ use Collectibles\Contracts\IO as IOContract;
 use Composer\InstalledVersions;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Exceptions\CouldNotStartHttpServerException;
-use Flows\Exceptions\HttpServerRunningException;
+use Flows\Exceptions\HttpHandlerServerRunningException;
 use Flows\Facades\Config;
 use Flows\Facades\Logger;
 use Flows\Processes\Process;
@@ -31,8 +31,7 @@ class StartHttpServerProcess extends Process
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     if ($this->pingHandlerServer()) {
-                        Logger::info('HTTP server running');
-                        throw new HttpServerRunningException();
+                        throw new HttpHandlerServerRunningException();
                     }
 
                     $ds = DIRECTORY_SEPARATOR;
@@ -78,7 +77,7 @@ class StartHttpServerProcess extends Process
                         2 => ['file', Config::getLogDirectory() . 'http-server.log', 'a'], // STDERR
                     ];
                     $settings = Config::getApplicationSettings();
-                    $address = $settings->get('http.server.listen_on');
+                    $address = $settings->get('http.server.address');
                     $cmdSocketPath = $settings->get('http.server.command_socket_path');
                     $externalProcessReadTimeout = $settings->get('http.server.timeout_read_external_process');
                     $uid = $this->getHexadecimal(32);
@@ -103,7 +102,7 @@ class StartHttpServerProcess extends Process
                         throw new CouldNotStartHttpServerException();
                     }
 
-                    Logger::info("Started HTTP server on address {$address} with command socket {$cmdSocketPath}, unique identifier {$uid}");
+                    Logger::info("Started HTTP handler server: address {$address}, command socket {$cmdSocketPath}, unique identifier {$uid}");
                     return $io;
                 }
 

@@ -7,7 +7,7 @@ namespace Flows\Exceptions;
 use RuntimeException;
 use Throwable;
 
-class HttpServerRunningException extends RuntimeException
+class HttpHandlerServerRunningException extends RuntimeException
 {
     public function __construct(
         string $message = "HTTP server running",

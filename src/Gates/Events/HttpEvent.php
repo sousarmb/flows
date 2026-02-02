@@ -57,11 +57,61 @@ abstract class HttpEvent implements GateEventContract, HttpEventContract, Stream
 
     /**
      * Register event/resource with HTTP server
+     */
+    private function registerPathWithHandlerServer(): void
+    {
+        // This socket is used for PHP <-> Handler server communications
+        $temp = sys_get_temp_dir() . DIRECTORY_SEPARATOR;
+        $this->handlerSrvSockFile = $temp . $this->getHexadecimal(8, 'flows-', '.sock');
+        // Fresh start
+        @unlink($this->handlerSrvSockFile);
+        // Register command
+        $cmd = json_encode([
+            'command' => 'register',
+            'path' => $this->path,
+            'socket_file' => $this->handlerSrvSockFile,
+            'external_process_id' => INSTANCE_UID,
+            'allowed_methods' => $this->allowedMethods,
+            'timeout' => isset($this->timeout) ? $this->timeout : self::TIMEOUT
+        ]) . "\n";
+        $resp = $this->sendCommandToHandlerServer($cmd);
+        if (!$resp['ok']) {
+            throw new RuntimeException("Could not register path {$this->path}: {$resp['error']}");
+        }
+
+        Logger::info("Registered path: {$this->path}");
+    }
+
+    /**
+     * Deregister event/resource with HTTP server
+     */
+    private function deregisterPathWithHandlerServer(): void
+    {
+        // Deregister command
+        $cmd = json_encode([
+            'command' => 'deregister',
+            'path' => $this->path,
+            'socket_file' => "",
+            'external_process_id' => INSTANCE_UID,
+            'allowed_methods' => [],
+            'timeout' => 0
+        ]) . "\n";
+        $resp = $this->sendCommandToHandlerServer($cmd);
+        if ($resp['ok']) {
+            Logger::info("Deregistered path: {$this->path}");
+        } else {
+            // Fail silently: resource probably not there anymore or incorrect owner, just log this
+            Logger::info("Could not deregister path {$this->path}: {$resp['error']}");
+        }
+    }
+
+    /**
+     * Register event/resource with HTTP server
      * Creates and binds to command (comms) socket where HTTP server listens to commands
      * 
      * @throws RuntimeException If unable to open command pipe file or register paths with HTTP server
      */
-    private function registerPathWithHandlerServer(): void
+    private function sendCommandToHandlerServer(string $cmd): array
     {
         $cmdSockFile = Config::getApplicationSettings()->get('http.server.command_socket_path');
         $sock = socket_create(AF_UNIX, SOCK_STREAM, 0);
@@ -71,6 +121,7 @@ abstract class HttpEvent implements GateEventContract, HttpEventContract, Stream
         // Wait for handler server to create file (but not forever)
         $this->waitForFile($cmdSockFile);
         if (!@socket_connect($sock, $cmdSockFile)) {
+            socket_close($sock);
             $msg = sprintf(
                 'Socket connect %s fail: %s',
                 $cmdSockFile,
@@ -78,28 +129,18 @@ abstract class HttpEvent implements GateEventContract, HttpEventContract, Stream
             );
             throw new RuntimeException($msg);
         }
-        // This socket is used for PHP <-> Handler server communications
-        $temp = sys_get_temp_dir() . DIRECTORY_SEPARATOR;
-        $this->handlerSrvSockFile = $temp . $this->getHexadecimal(8, 'flows-', '.sock');
-        @unlink($this->handlerSrvSockFile);
-        // Register resource
-        $cmd = json_encode([
-            'command' => 'REGISTER',
-            'path' => $this->path,
-            'socket_file' => $this->handlerSrvSockFile,
-            'external_process_id' => INSTANCE_UID,
-            'allowed_methods' => $this->allowedMethods,
-            'timeout' => isset($this->timeout) ? $this->timeout : self::TIMEOUT
-        ]) . "\n";
+
         $len = strlen($cmd);
         $sent = socket_write($sock, $cmd, $len);
         if (false === $sent) {
+            socket_close($sock);
             $msg = sprintf(
                 'Error reading response from handler server: %s',
                 socket_strerror(socket_last_error($sock))
             );
             throw new RuntimeException($msg);
         } elseif ($sent < $len) {
+            socket_close($sock);
             throw new RuntimeException('Could not send whole command message to handler server');
         }
 
@@ -118,11 +159,7 @@ abstract class HttpEvent implements GateEventContract, HttpEventContract, Stream
         }
 
         $resp = json_decode($resp, true);
-        if (!$resp['ok']) {
-            throw new RuntimeException("Could not register path {$this->path}: {$resp['error']}");
-        }
-
-        Logger::info("Registered path: {$this->path}");
+        return $resp;
     }
 
     /**
@@ -155,6 +192,7 @@ abstract class HttpEvent implements GateEventContract, HttpEventContract, Stream
      */
     public function closeResource(): void
     {
+        $this->deregisterPathWithHandlerServer();
         if (
             isset($this->handlerSrvSock)
             && is_resource($this->handlerSrvSock)

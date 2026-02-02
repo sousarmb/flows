@@ -47,5 +47,7 @@ class <!--name-->Gate extends EventGate
     /**
      * @param bool $forSerialization
      */
-    public function cleanUp(bool $forSerialization = false): void {}
+    public function cleanUp(bool $forSerialization = false): void {
+        parent::cleanUp();
+    }
 }

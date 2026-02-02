@@ -373,22 +373,6 @@ class BootProcess extends Process
                 }
 
                 public function cleanUp(bool $forSerialization = false): void {}
-            },
-            new class implements TaskContract {
-                /**
-                 * @param IOContract|Collection|null $io
-                 * @return IOContract|null
-                 */
-                public function __invoke(?IOContract $io = null): ?IOContract
-                {
-                    if (!function_exists('posix_mkfifo')) {
-                        LoggerFacade::info('posix_mkfifo() not defined, cannot use HTTP events in event gates');
-                    }
-
-                    return $io;
-                }
-
-                public function cleanUp(bool $forSerialization = false): void {}
             }
         ];
         parent::__construct();

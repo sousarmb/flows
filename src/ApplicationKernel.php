@@ -8,7 +8,7 @@ use Collectibles\Collection;
 use Collectibles\Contracts\IO as IOContract;
 use Flows\Container\Container;
 use Flows\Event\Kernel as EventKernel;
-use Flows\Exceptions\HttpServerRunningException;
+use Flows\Exceptions\HttpHandlerServerRunningException;
 use Flows\Facades\Config;
 use Flows\Facades\Logger;
 use Flows\Gates\AndGate;
@@ -86,10 +86,11 @@ class ApplicationKernel
                         $startHttpServerProcess = new StartHttpServerProcess();
                         try {
                             $startHttpServerProcess->run();
-                        } catch (HttpServerRunningException $e) {
+                            $startHttpServerProcess->cleanUp();
+                        } catch (HttpHandlerServerRunningException $e) {
                             // Already running, carry on
+                            Logger::info('HTTP handler server running');
                         }
-                        $startHttpServerProcess->cleanUp();
                     }
                 }
                 // Branch flow

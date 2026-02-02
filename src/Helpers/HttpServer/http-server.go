@@ -589,18 +589,20 @@ func handleClient(conn net.Conn, mux *DynamicMux) {
 
 	var resp CommandReply
 	switch cmd.Command {
-	case "REGISTER":
+	case "register":
 		resp = register(cmd, mux)
-	case "DEREGISTER":
+	case "deregister":
 		resp = deregister(cmd, mux)
 	default:
 		resp = CommandReply{Ok: false, Error: "unknown command"}
 	}
 
+	if resp.Ok {
+		logThis(LogLine{cmd.Command, "ok", "", cmd.Path, serverUID, cmd.ExternalProcessID})
+	}
 	if err := enc.Encode(resp); err != nil {
 		logThis(LogLine{"client:request:reply", "fail", err.Error(), cmdSockPath, serverUID, cmd.ExternalProcessID})
-	} else {
-		logThis(LogLine{"register", "ok", "", cmd.Path, serverUID, cmd.ExternalProcessID})
+		return
 	}
 }
 
@@ -631,8 +633,10 @@ func decreaseResourceLifetime(ctx context.Context, mux *DynamicMux) {
 // ---------------- Housekeeping ----------------
 
 func housekeeping(parent context.Context, cancel context.CancelFunc, mux *DynamicMux) {
+	// Give time to register
+	time.Sleep(3 * time.Second)
 	logThis(LogLine{"housekeep", "start", "", "", serverUID, ""})
-	ticker := time.NewTicker(3 * time.Second)
+	ticker := time.NewTicker(10 * time.Millisecond)
 	for {
 		select {
 		case <-parent.Done():
