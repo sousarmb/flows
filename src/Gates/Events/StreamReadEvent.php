@@ -18,8 +18,20 @@ abstract readonly class StreamReadEvent implements GateEventContract, StreamCont
      */
     protected mixed $stream;
 
-    public function getStream(): mixed
+    public function getResource(): mixed
     {
         return $this->stream;
+    }
+
+    public function closeResource(): void
+    {
+        if (is_resource($this->stream)) {
+            fclose($this->stream);
+        }
+    }
+
+    public function __destruct()
+    {
+        $this->closeResource();
     }
 }

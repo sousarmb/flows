@@ -20,7 +20,7 @@ class EventProcess extends CLICommand
     protected string $help = 'Create a named gate event class in App/Events';
     protected array $arguments = [
         'name' => '=[name] Gate event class name',
-        'type' => '=[frequent|stream]'
+        'type' => '=[frequent|http|stream]'
     ];
 
     public function __construct()
@@ -72,8 +72,8 @@ class EventProcess extends CLICommand
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     if ($type = $io->get('argv.type')) {
-                        if (!in_array($type, ['frequent', 'stream'])) {
-                            throw new InvalidArgumentException('Gate event type is: frequent|stream');
+                        if (!in_array($type, ['frequent', 'http', 'stream'])) {
+                            throw new InvalidArgumentException('Gate event type is: frequent|http|stream');
                         }
 
                         return $io;
@@ -81,8 +81,8 @@ class EventProcess extends CLICommand
                     // Query the user
                     $tryAgain = true;
                     do {
-                        $type = readline('Gate event type is frequent|stream? ');
-                        if (!in_array($type, ['frequent', 'stream'])) {
+                        $type = readline('Gate event type is frequent|http|stream? ');
+                        if (!in_array($type, ['frequent', 'http', 'stream'])) {
                             echo PHP_EOL . 'Invalid gate event type ' . PHP_EOL;
                         } else {
                             $io->add($type, 'argv.type');

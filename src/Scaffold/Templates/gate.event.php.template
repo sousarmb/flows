@@ -5,23 +5,49 @@ declare(strict_types=1);
 namespace App\Processes\Gates;
 
 use Flows\Gates\EventGate;
-use Flows\Gates\Events;
+use Flows\Gates\Events; // ... If you want to use built-in events, otherwise remove
 
 class <!--name-->Gate extends EventGate
 {
+    public function __construct() {
+        // Set timeout for events to resolve
+        $this->expires = 1; // second(s)
+    }
+
+    public function registerEvents(): void {
+        /**
+         * Register events to be evaluated in the gate and determine which one makes the flow resume 
+         * Example usage:
+         * 
+         * $this->pushEvent(new instance of GateEventContract)
+         *   ->pushEvent(new instance of GateEventContract);
+         */
+    }
+
     /**
-     * @return string Branch flow to this process
+     *  
+     * Called after one event has resolved successfully ($winner) or timeout ($expires)
+     *
+     * @return string Branch to this process
      */
     public function __invoke(): string
     {
-        $this->expires = 1;
-        $this->pushEvent();
-        $this->waitForEvent();
-        return $this->winner;
+        /**
+         * $winner has the gate event instance that resolved successfully (or null if none resolved)
+         * Example usage:
+         * 
+         * return $this->winner instanceof <whatever>GateEvent
+         *   ? <another>Process::class
+         *   : <default>Process::class;
+         * 
+         * The chosen/next process receives $this->io as input
+         */
     }
 
     /**
      * @param bool $forSerialization
      */
-    public function cleanUp(bool $forSerialization = false): void {}
+    public function cleanUp(bool $forSerialization = false): void {
+        parent::cleanUp();
+    }
 }

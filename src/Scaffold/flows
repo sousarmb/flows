@@ -6,7 +6,8 @@ declare(strict_types=1);
 use Flows\Contracts\CLICommand;
 use Flows\Processes\Internal\IO\CLICollection;
 
-require __DIR__ . '/../../../../autoload.php';
+$ds = DIRECTORY_SEPARATOR;
+require __DIR__ . "{$ds}..{$ds}..{$ds}..{$ds}..{$ds}autoload.php";
 
 define('FLOWS_COMMAND_CONTEXT', 0);
 
@@ -132,8 +133,8 @@ function main(array $argv, int $argc): bool
         return false;
     }
 
-    echo PHP_EOL . 'Command output:' . PHP_EOL;
-    echo $output->get('message') . PHP_EOL . PHP_EOL;
+    echo PHP_EOL . 'Command exit status: ' . PHP_EOL . ($output->get('success') ? 'Success' : 'Fail') . PHP_EOL;
+    echo PHP_EOL . 'Command output: ' . PHP_EOL . $output->get('message') . PHP_EOL . PHP_EOL;
     return $output->get('success');
 }
 

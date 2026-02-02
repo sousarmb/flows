@@ -11,7 +11,6 @@ use Flows\Processes\Internal\CLI\CheckForCommandFlagTask;
 use Flows\Processes\Internal\IO\CLICollection;
 use Flows\Processes\Internal\IO\CommandOutput;
 use InvalidArgumentException;
-use LogicException;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
@@ -32,7 +31,10 @@ class ScaffoldProcess extends CLICommand
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     if (is_dir($io->getScaffoldDestinationDirectory())) {
-                        throw new LogicException('Application directory already exists');
+                        return new CommandOutput(
+                            'Application scaffold already exists',
+                            false
+                        );
                     }
 
                     $this->copyDirectory(

@@ -1,38 +1,125 @@
 package main
 
+// A simplified web server using Unix Domain Sockets.
+//
+// Features:
+//  - Command socket
+//  - One persistent unix socket connection per handler
+//  - Single-shot handlers
+//
+// External process protocol for commands (JSON message):
+//  - REGISTER command message (type Command)
+//  - DEREGISTER command message (type Command)
+//
+// When HTTP request arrives, server sends JSON message (type RequestMsg) on handler socket
+// External process replies with JSON message (type ResponseMsg)
+
 import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"errors"
 	"flag"
 	"io"
 	"log"
+	"mime"
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"slices"
-	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
+	"syscall"
 	"time"
 
 	sanitize "flows.local/http-server/sanitize"
 )
 
-/*
- * CONFIG
- */
+// ---------------- Messages ----------------
 
-var port *int
-var commandPipePath *string
+type PingPong struct {
+	Message   string `json:"message"`
+	Status    string `json:"status"`
+	Now       string `json:"now"`
+	ServerUid string `json:"server_uid"`
+}
 
-/*
- * PIPE UTIL
- */
+type Command struct {
+	Command           string   `json:"command"`
+	Path              string   `json:"path"`
+	SocketFile        string   `json:"socket_file"`
+	ExternalProcessID string   `json:"external_process_id"`
+	AllowedMethods    []string `json:"allowed_methods"`
+	Timeout           int      `json:"timeout"`
+}
 
-// createFileForExternalProcess() creates a file in the os temporary directory that is meant to be used by the external process that's handling the HTTP request content.
-func createFileForExternalProcess() (*os.File, error) {
+type RequestMsg struct {
+	Method      string              `json:"method"`
+	Path        string              `json:"path"`
+	Headers     map[string][]string `json:"headers"`
+	Body        any                 `json:"body,omitempty"`
+	ContentType string              `json:"content_type"`
+	Files       map[string]string   `json:"files,omitempty"`
+	Cookies     []*http.Cookie      `json:"cookies"`
+	InstanceUID string              `json:"instance_uid"` // Server instance unique identifier
+}
+
+type ResponseMsg struct {
+	Ok          bool   `json:"ok"`           // External process signal, FALSE => respond with 400, TRUE => 200
+	Code        int    `json:"code"`         // Reserved for custom code
+	Status      string `json:"status"`       // Reserved for custom status message
+	Message     string `json:"message"`      // Reserved for custom message
+	InstanceUID string `json:"instance_uid"` // External process unique identifier
+}
+
+// ---------------- Handler Entry ----------------
+
+type HandlerEntry struct {
+	// Conn              net.Conn
+	Enabled           bool
+	Handling          bool         // external process is evaluating the request
+	Handled           bool         // external process has handled the request
+	SocketFile        string       // Socket to <-> from external PHP process
+	ExternalProcessID string       // PHP process unique identifier
+	AllowedMethods    []string     // Resource allowed HTTP methods
+	Timeout           int          // The resource is not valid (stale) if timeout <= 0
+	Handler           http.Handler // Request handler
+	mu                sync.Mutex
+}
+
+// ---------------- Logging ----------------
+
+type LogLine struct {
+	Operation         string `json:"operation"`
+	Status            string `json:"status"`
+	Reason            string `json:"reason,omitempty"`
+	Resource          string `json:"resource,omitempty"`
+	ServerInstance    string `json:"server_instance"`
+	ExternalProcessID string `json:"external_process_id,omitempty"`
+}
+
+func logThis(line LogLine) {
+	j, _ := json.Marshal(line)
+	log.Println(string(j))
+}
+
+// ---------------- Dynamic Mux ----------------
+
+type DynamicMux struct {
+	mu       sync.RWMutex
+	handlers map[string]*HandlerEntry
+}
+
+func NewMux() *DynamicMux {
+	return &DynamicMux{handlers: make(map[string]*HandlerEntry)}
+}
+
+// ---------------- Handle requests ----------------
+
+/* Creates a file in the os temporary directory that is meant to be used by the external process that's
+ * handling the HTTP request content. */
+func createFileForExtProc() (*os.File, error) {
 	f, err := os.CreateTemp(os.TempDir(), "flows-http-request-file-")
 	if err != nil {
 		return nil, err
@@ -41,564 +128,647 @@ func createFileForExternalProcess() (*os.File, error) {
 	return f, nil
 }
 
-type AcceptedResponse struct {
-	// Message    string `json:"message"`    // "Request accepted. Proceeding with process."
-	// MonitorURL string `json:"monitorUrl"` // "http://example.com/tasks/123/status"
-	TaskID string `json:"task_id"`
-}
+/* Clean up in case of errors before sending message to external process.
+ * Delete files in the os temporary directory that is meant to be used by the external process that's
+ * handling the HTTP request content. */
+func deleteFilesForExtProc(files map[string]string, e *HandlerEntry) {
+	for _, filePath := range files {
+		_, err := os.Stat(filePath)
+		if err != nil {
+			// File previously removed ?!
+			logThis(LogLine{"stat", "fail", err.Error(), filePath, serverUID, e.ExternalProcessID})
+			continue
+		}
 
-type commandMessage struct {
-	Command           string   `json:"command"`
-	Path              string   `json:"path"`
-	PipeTo            string   `json:"pipe_to"`
-	PipeFrom          string   `json:"pipe_from"`
-	ExternalProcessID string   `json:"external_process_id"`
-	AllowedMethods    []string `json:"allowed_methods"`
-}
-
-type requestMessage struct {
-	Method      string              `json:"method"`
-	Path        string              `json:"path"`
-	Headers     map[string][]string `json:"headers"`
-	Body        map[string]any      `json:"body"`
-	ContentType string              `json:"contentType"`
-	Files       map[string]string   `json:"files"`
-	Cookies     []*http.Cookie      `json:"cookies"`
-}
-
-/*
- * FUNCTIONS
- */
-
-// func handleOptionsRequest(w http.ResponseWriter, r *http.Request) {
-// 	w.WriteHeader(http.StatusNoContent)
-// 	w.Header().Set("Access-Control-Allow-Origin", "*")
-// 	w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
-// 	w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization")
-// 	w.Header().Set("Access-Control-Allow-Credentials", "true")
-// 	w.Header().Set("Access-Control-Max-Age", "86400") // 24 hours
-// 	// Additional headers
-// 	w.Header().Set("Accept", "application/x-www-form-urlencoded, multipart/form-data, application/json")
-// }
-
-func handlePostOrPutOrPatchMethod(pipeTo, pipeFrom *os.File, w http.ResponseWriter, r *http.Request, m *DynamicMux, entry *handlerEntry, path string, externalProcessId string) {
-	// Prepare message for external process
-	message := requestMessage{
-		Method:  r.Method,
-		Path:    r.URL.EscapedPath(),
-		Headers: r.Header,
-		// Body:    make(map[string]any),
-		Cookies: r.Cookies(),
+		err = os.Remove(filePath)
+		if err != nil {
+			// File previously removed ?!
+			logThis(LogLine{"remove:file", "fail", err.Error(), filePath, serverUID, e.ExternalProcessID})
+			continue
+		}
 	}
-	// Read body fields
-	message.ContentType = r.Header.Get("Content-Type")
-	switch message.ContentType {
+}
+
+func handleWithoutBody(req *RequestMsg, e *HandlerEntry) (ResponseMsg, error) {
+	req.Body = nil
+	req.Files = nil
+	return ResponseMsg{
+		Ok:          true,
+		Code:        0,
+		Status:      "success",
+		Message:     "Set message body",
+		InstanceUID: e.ExternalProcessID}, nil
+}
+
+func handleWithBody(r *http.Request, req *RequestMsg, e *HandlerEntry) (ResponseMsg, error) {
+	rmSize := ResponseMsg{
+		Ok:          false,
+		Code:        400,
+		Status:      "fail",
+		Message:     "Request max size is 16 MB",
+		InstanceUID: e.ExternalProcessID}
+
+	switch req.ContentType {
 	case "application/json":
 		// Read raw body
 		body, err := io.ReadAll(r.Body)
 		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			m.mu.Lock()
-			entry.handling.Store(false)
-			m.mu.Unlock()
-			return
+			return rmSize, errors.New(rmSize.Message)
 		}
 		// Sanitize raw body
 		body = sanitize.StripInvisibleBytes(body)
 		// Parse JSON body
 		if !json.Valid(body) {
-			w.WriteHeader(http.StatusBadRequest)
-			m.mu.Lock()
-			entry.handling.Store(false)
-			m.mu.Unlock()
-			return
+			rm := ResponseMsg{
+				Ok:          false,
+				Code:        400,
+				Status:      "fail",
+				Message:     "Invalid JSON",
+				InstanceUID: e.ExternalProcessID}
+			return rm, errors.New(rm.Message)
 		}
-		// Add to message
-		message.Body["raw"] = string(body)
+		// Set message body
+		req.Body = string(body)
+		return ResponseMsg{
+			Ok:          true,
+			Code:        0,
+			Status:      "success",
+			Message:     "Set message body",
+			InstanceUID: e.ExternalProcessID}, nil
+
 	case "application/x-www-form-urlencoded":
-		if r.Form != nil && message.Body == nil {
+		err := r.ParseForm()
+		if err != nil {
+			return rmSize, errors.New(rmSize.Message)
+		}
+		if r.Form != nil && req.Body == nil {
+			/* Only concrete types (e.g., map[string]string) support indexing.
+			 * Fix by doing a type assertion (or switching on the type) and ensuring message.Body
+			 * is a map before writing into it. */
+			mb := make(map[string]string)
 			for key, values := range r.Form {
 				if len(values) > 0 {
-					message.Body[key] = sanitize.StripInvisibleRunes(values[0])
+					mb[key] = sanitize.StripInvisibleRunes(values[0])
 				}
 			}
+			if len(mb) > 0 {
+				req.Body = mb
+			} else {
+				req.Body = []any{}
+			}
 		}
+
+		return ResponseMsg{
+			Ok:          true,
+			Code:        0,
+			Status:      "success",
+			Message:     "Set message body",
+			InstanceUID: e.ExternalProcessID}, nil
+
 	case "multipart/form-data":
+		err := r.ParseMultipartForm(maxBodySize)
+		if err != nil {
+			return rmSize, errors.New(rmSize.Message)
+		}
 		if r.MultipartForm != nil && r.MultipartForm.Value != nil {
+			mb := make(map[string]string)
 			for key, values := range r.MultipartForm.Value {
 				if len(values) > 0 {
-					message.Body[key] = sanitize.StripInvisibleRunes(values[0])
+					mb[key] = sanitize.StripInvisibleRunes(values[0])
 				}
+			}
+			if len(mb) > 0 {
+				req.Body = mb
+			} else {
+				req.Body = []any{}
 			}
 		}
 		if r.MultipartForm != nil && r.MultipartForm.File != nil {
-			message.Files = make(map[string]string)
+			req.Files = make(map[string]string)
 			for _, fhs := range r.MultipartForm.File {
 				for _, fh := range fhs {
 					file, err := fh.Open()
 					if err != nil {
-						w.WriteHeader(http.StatusBadRequest)
-						w.Write([]byte("Cannot open file: " + fh.Filename))
-						m.mu.Lock()
-						entry.handling.Store(false)
-						m.mu.Unlock()
-						return
-					}
-
-					defer file.Close()
-					fileData := make([]byte, fh.Size)
-					_, err = file.Read(fileData)
-					if err != nil {
-						w.WriteHeader(http.StatusBadRequest)
-						w.Write([]byte("Cannot read file: " + fh.Filename))
-						m.mu.Lock()
-						entry.handling.Store(false)
-						m.mu.Unlock()
-						return
+						rm := ResponseMsg{
+							Ok:          false,
+							Code:        400,
+							Status:      "fail",
+							Message:     "Failed to open file " + fh.Filename,
+							InstanceUID: e.ExternalProcessID}
+						return rm, errors.New(rm.Message)
 					}
 					// Create file for external process with uploaded form file content
-					fileForExternalProcess, err := createFileForExternalProcess()
+					fileForExtProc, err := createFileForExtProc()
 					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						w.Write([]byte("Cannot create file for external process"))
-						m.mu.Lock()
-						entry.handling.Store(false)
-						m.mu.Unlock()
-						return
-					}
+						file.Close()
+						// Delete previously created files
+						defer deleteFilesForExtProc(req.Files, e)
 
-					_, err = writeFile(fileForExternalProcess, fileData)
+						rm := ResponseMsg{
+							Ok:          false,
+							Code:        400,
+							Status:      "fail",
+							Message:     "Failed to create file for external process",
+							InstanceUID: e.ExternalProcessID}
+						return rm, errors.New(rm.Message)
+					}
+					// Copy file for external process use
+					_, err = io.Copy(fileForExtProc, file)
+					fileForExtProc.Close()
+					file.Close()
 					if err != nil {
-						w.WriteHeader(http.StatusInternalServerError)
-						w.Write([]byte("Cannot save file: " + fh.Filename))
-						m.mu.Lock()
-						entry.handling.Store(false)
-						m.mu.Unlock()
-						return
+						// Delete previously created files
+						req.Files[sanitize.StripInvisibleRunes(fh.Filename)] = fileForExtProc.Name()
+						defer deleteFilesForExtProc(req.Files, e)
+
+						rm := ResponseMsg{
+							Ok:          false,
+							Code:        400,
+							Status:      "fail",
+							Message:     "Failed to save file " + fh.Filename,
+							InstanceUID: e.ExternalProcessID}
+						return rm, errors.New(rm.Message)
 					}
 					// Add to message
-					message.Files[sanitize.StripInvisibleRunes(fh.Filename)] = fileForExternalProcess.Name()
+					req.Files[sanitize.StripInvisibleRunes(fh.Filename)] = fileForExtProc.Name()
 				}
 			}
+			// Remove temporary files
+			r.MultipartForm.RemoveAll()
 		}
-	default:
-		w.WriteHeader(http.StatusBadRequest)
-		m.mu.Lock()
-		entry.handling.Store(false)
-		m.mu.Unlock()
-		return
 	}
-	// Prepare message for external process
-	jsonData, err := json.Marshal(message)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Cannot serialize message"))
-		m.mu.Lock()
-		entry.handling.Store(false)
-		m.mu.Unlock()
-		return
-	}
-	// Send message to external process
-	err = writePipeMessage(jsonData, pipeTo)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Cannot send to external process"))
-		m.mu.Lock()
-		entry.handling.Store(false)
-		m.mu.Unlock()
-		log.Println("Pipe write error:", err)
-	}
-	// Read external process response (valid or not?)
-	response := readPipeMessage(pipeFrom)
-	if response == "ok" {
-		// Send accepted response
-		responseBody := AcceptedResponse{
-			TaskID: externalProcessId,
-		}
-		w.Header().Set("Content-Type", "application/json")
-		jsonBody, _ := json.Marshal(responseBody)
-		w.Write(jsonBody)
-		w.WriteHeader(http.StatusAccepted)
-		// Mark handler as disabled and handled
-		m.mu.Lock()
-		entry.enabled.Store(false)
-		entry.handled.Store(true)
-		m.mu.Unlock()
-		log.Printf("HANDLER %s handled\n", path)
-	} else {
-		// Release handler and mark as not handled
-		w.WriteHeader(http.StatusBadRequest)
-		m.mu.Lock()
-		entry.handling.Store(false)
-		m.mu.Unlock()
-	}
+	return ResponseMsg{
+		Ok:          true,
+		Code:        0,
+		Status:      "success",
+		Message:     "Set message body and/or files",
+		InstanceUID: e.ExternalProcessID}, nil
 }
-
-func handleGetOrDeleteMethod(pipeTo, pipeFrom *os.File, w http.ResponseWriter, r *http.Request, m *DynamicMux, entry *handlerEntry, path string) {
-	message := requestMessage{
-		Method:  r.Method,
-		Path:    r.URL.EscapedPath(),
-		Headers: r.Header,
-		// Body:        nil,
-		// ContentType: "",
-		Cookies: r.Cookies(),
-	}
-	jsonData, _ := json.Marshal(message)
-	err := writePipeMessage(jsonData, pipeTo)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("Cannot send to external process"))
-		m.mu.Lock()
-		entry.handling.Store(false)
-		m.mu.Unlock()
-		log.Println("Pipe write error:", err)
-	}
-
-	response := readPipeMessage(pipeFrom)
-	if response == "nok" {
-		w.WriteHeader(http.StatusBadRequest)
-		m.mu.Lock()
-		entry.handling.Store(false)
-		m.mu.Unlock()
-		return
-	}
-	// Send accepted response
-	if len(response) > 0 {
-		if false == json.Valid([]byte(response)) {
-			log.Println("bad json")
-		} else {
-			log.Println("good json")
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte(response))
-	}
-
-	w.WriteHeader(http.StatusOK)
-	// Mark handler as disabled and handled
-	m.mu.Lock()
-	entry.enabled.Store(false)
-	entry.handled.Store(true)
-	m.mu.Unlock()
-	log.Printf("HANDLER %s handled\n", path)
-}
-
-func writeFile(file *os.File, data []byte) (n int, err error) {
-	n, err = file.Write(data)
-	if err != nil {
-		return 0, err
-	}
-
-	return n, nil
-}
-
-func writePipeMessage(message []byte, pipe *os.File) error {
-	_, err := pipe.Write(append(message, []byte("\n")...))
-	return err
-}
-
-func readPipeMessage(pipe *os.File) string {
-	scanner := bufio.NewScanner(pipe)
-	for {
-		scanner.Scan()
-		line := strings.TrimSpace(scanner.Text())
-		if line == "" {
-			time.Sleep(333 * time.Microsecond)
-			continue
-		}
-
-		return line
-	}
-}
-
-/*
- * DYNAMIC MUX
- */
-
-type handlerEntry struct {
-	enabled           atomic.Bool
-	handler           http.Handler
-	handling          atomic.Bool // external process is evaluating the request
-	handled           atomic.Bool // external process has handled the request
-	pipeTo            string      // ... to external process (write-only)
-	pipeFrom          string      // ... from external process (read-only)
-	externalProcessID string
-	allowedMethods    []string
-}
-
-type DynamicMux struct {
-	mu       sync.RWMutex
-	handlers map[string]*handlerEntry
-}
-
-func NewDynamicMux() *DynamicMux {
-	return &DynamicMux{
-		handlers: make(map[string]*handlerEntry),
-	}
-}
-
-/*
- * DYNAMIC MUX METHODS
- */
 
 func (m *DynamicMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	m.mu.RLock()
-	entry, ok := m.handlers[r.URL.Path]
+	e := m.handlers[r.URL.Path]
 	m.mu.RUnlock()
 
-	if !ok || !entry.enabled.Load() {
+	if e == nil {
 		http.NotFound(w, r)
 		return
-	}
-
-	entry.handler.ServeHTTP(w, r)
-}
-
-func (m *DynamicMux) Register(path string, pipeToProcess string, pipeFromProcess string, externalProcessID string, allowedMethods []string) {
-	if slices.Contains(allowedMethods, "CONNECT") || slices.Contains(allowedMethods, "HEAD") || slices.Contains(allowedMethods, "OPTIONS") || slices.Contains(allowedMethods, "TRACE") {
-		log.Printf("Cannot register handler %s: invalid allowed methods\n", path)
+	} else if (r.URL.Path == "/ping") && (r.Method == http.MethodGet) {
+		e.Handler.ServeHTTP(w, r)
 		return
 	}
-	if len(allowedMethods) == 0 {
-		allowedMethods = []string{"GET", "POST", "PUT", "PATCH", "DELETE"}
-	}
 
-	entry := &handlerEntry{}
-	entry.enabled.Store(true)
-	entry.handling.Store(false)
-	entry.handled.Store(false)
-	entry.pipeTo = pipeToProcess
-	entry.pipeFrom = pipeFromProcess
-	entry.externalProcessID = externalProcessID
-	entry.allowedMethods = allowedMethods
-
-	// Define handler function
-	entry.handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Fail if handled previously or about to deregister
-		if !entry.enabled.Load() {
-			http.NotFound(w, r)
-			return
-		}
-		// Allow Preflight request
-		// if r.Method == http.MethodOptions {
-		// 	handleOptionsRequest(w, r)
-		// 	return
-		// }
-		// Fail if method not supported
-		if !slices.Contains(entry.allowedMethods, r.Method) {
-			w.WriteHeader(http.StatusMethodNotAllowed)
-			return
-		}
-		// Fail if already handling
-		if entry.handling.Load() {
-			w.WriteHeader(http.StatusLocked)
-			return
-		}
-		// Mark as handling, prevent concurrent handling (multiple requests)
-		m.mu.Lock()
-		entry.handling.Store(true)
-		m.mu.Unlock()
-		// Parse form data
-		if r.Method == http.MethodPatch || r.Method == http.MethodPost || r.Method == http.MethodPut {
-			contentType := r.Header.Get("Content-Type")
-			if strings.HasPrefix(contentType, "multipart/form-data") {
-				err := r.ParseMultipartForm(4 << 20) // 4 MB
+	e.mu.Lock()
+	if !e.Enabled {
+		http.NotFound(w, r)
+		e.mu.Unlock()
+		return
+	} else if e.Handling {
+		w.WriteHeader(http.StatusLocked)
+		e.mu.Unlock()
+		return
+	} else if !slices.Contains(e.AllowedMethods, r.Method) {
+		w.WriteHeader(http.StatusMethodNotAllowed)
+		e.mu.Unlock()
+		return
+	} else if hAccept := r.Header.Get("Accept"); hAccept != "" {
+		canServe := false
+		if hAccept == "*/*" {
+			canServe = true
+		} else {
+			for _, v := range strings.Split(hAccept, ",") {
+				mt, _, err := mime.ParseMediaType(strings.TrimSpace(v))
 				if err != nil {
 					w.WriteHeader(http.StatusBadRequest)
-					m.mu.Lock()
-					entry.handling.Store(false)
-					m.mu.Unlock()
+					e.mu.Unlock()
 					return
 				}
-			} else {
-				// Content-Type: application/x-www-form-urlencoded
-				err := r.ParseForm()
-				if err != nil {
-					w.WriteHeader(http.StatusBadRequest)
-					m.mu.Lock()
-					entry.handling.Store(false)
-					m.mu.Unlock()
-					return
+				if mt == "application/json" || mt == "application/x-www-form-urlencoded" || mt == "multipart/form-data" {
+					canServe = true
+					break
 				}
 			}
 		}
-		// Start response process
-		//
-		// Open pipes to communicate with external process
-		pipeTo, err := os.OpenFile(entry.pipeTo, os.O_WRONLY, 0664)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			log.Printf("Pipe %s error: %s\n", entry.pipeTo, err)
+		if !canServe {
+			w.Header().Set("Accept", "application/json, application/x-www-form-urlencoded, multipart/form-data")
+			w.WriteHeader(http.StatusUnsupportedMediaType)
+			e.mu.Unlock()
 			return
 		}
-		defer pipeTo.Close()
-
-		pipeFrom, err := os.OpenFile(entry.pipeFrom, os.O_RDONLY, 0664)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			log.Printf("Pipe %s error: %s\n", entry.pipeFrom, err)
-			return
-		}
-		defer pipeFrom.Close()
-		// Send message to external process for request handling
-		switch r.Method {
-		case http.MethodGet, http.MethodDelete:
-			handleGetOrDeleteMethod(pipeTo, pipeFrom, w, r, m, entry, path)
-		case http.MethodPatch, http.MethodPost, http.MethodPut:
-			handlePostOrPutOrPatchMethod(pipeTo, pipeFrom, w, r, m, entry, path, externalProcessID)
-		}
-	})
-
-	m.mu.Lock()
-	m.handlers[path] = entry
-	m.mu.Unlock()
-
-	log.Printf("Registered handler: %s\n", path)
-}
-
-func (m *DynamicMux) Deregister(path string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
-	if entry, ok := m.handlers[path]; ok {
-		entry.enabled.Store(false)
-		delete(m.handlers, path)
-		log.Printf("Deregistered handler: %s\n", path)
 	}
-}
 
-/*
- * HANDLER WATCHER
- */
+	e.Handling = true
+	e.mu.Unlock()
 
-func watchHandlers(ctx context.Context, mux *DynamicMux, server *http.Server, cancel context.CancelFunc) {
-	// Allow time to register handlers
-	time.Sleep(time.Second)
-	// Start checking handlers
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("Context done")
-			return
-		default:
-			c := len(mux.handlers)
-			for k, v := range mux.handlers {
-				if !v.enabled.Load() && v.handled.Load() {
-					c--
-					// House-keeping
-					os.Remove(v.pipeTo)
-					os.Remove(v.pipeFrom)
-					log.Printf("Removed pipes: %s %s\n", v.pipeTo, v.pipeFrom)
-					delete(mux.handlers, k)
-					log.Printf("Deleted handler: %s\n", k)
-				}
-			}
-			if c == 0 {
-				// Remove command pipe
-				if _, err := os.Stat(*commandPipePath); err == nil {
-					os.Remove(*commandPipePath)
-					log.Printf("Removed command pipe: %s\n", *commandPipePath)
-				}
-
-				log.Println("No handlers available")
-				cancel()
-				time.Sleep(time.Second)
-				log.Println("Shutting down server")
-				server.Shutdown(ctx)
-			}
-		}
-		time.Sleep(333 * time.Millisecond)
+	req := RequestMsg{
+		Method:      r.Method,
+		Path:        r.URL.Path,
+		Headers:     r.Header,
+		Cookies:     r.Cookies(),
+		InstanceUID: serverUID,
 	}
-}
 
-/*
- * PIPE WATCHER
- */
+	var handleResp ResponseMsg
+	var err error
+	if slices.Contains([]string{http.MethodDelete, http.MethodGet}, r.Method) {
+		handleResp, err = handleWithoutBody(&req, e)
+	} else {
+		r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+		var ct string
+		ct, _, err = mime.ParseMediaType(r.Header.Get("Content-Type"))
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			e.mu.Lock()
+			e.Handling = false
+			e.mu.Unlock()
+			return
+		}
 
-func watchPipe(ctx context.Context, mux *DynamicMux, pipePath *string) {
-	f, err := os.OpenFile(*pipePath, os.O_RDONLY, 0664)
+		req.ContentType = ct
+		handleResp, err = handleWithBody(r, &req, e)
+	}
 	if err != nil {
-		log.Println("Pipe open error: ", err)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		jm, _ := json.Marshal(handleResp)
+		w.Write(jm)
+		e.mu.Lock()
+		e.Handling = false
+		e.mu.Unlock()
 		return
 	}
 
-	defer f.Close()
-	scanner := bufio.NewScanner(f)
+	conn, err := net.Dial("unix", e.SocketFile)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		e.mu.Lock()
+		e.Handling = false
+		e.mu.Unlock()
+		return
+	}
+
+	duration := time.Duration(timeoutReadExtProc) * time.Second
+	conn.SetReadDeadline(time.Now().Add(duration))
+	defer conn.Close()
+
+	enc := json.NewEncoder(conn)
+	dec := json.NewDecoder(conn)
+
+	if err := enc.Encode(req); err != nil {
+		defer deleteFilesForExtProc(req.Files, e)
+		logThis(LogLine{"socket:write", "fail", err.Error(), e.SocketFile, serverUID, e.ExternalProcessID})
+		w.WriteHeader(http.StatusInternalServerError)
+		e.mu.Lock()
+		e.Handling = false
+		e.mu.Unlock()
+		return
+	}
+
+	var resp ResponseMsg
+	if err := dec.Decode(&resp); err != nil && err != io.EOF {
+		/* Don't call deleteFilesForExtProc() here because the
+		 * external process might still be using these files */
+		logThis(LogLine{"socket:read", "fail", err.Error(), e.SocketFile, serverUID, e.ExternalProcessID})
+		w.WriteHeader(http.StatusInternalServerError)
+		e.mu.Lock()
+		e.Handling = false
+		e.mu.Unlock()
+		return
+	}
+
+	e.mu.Lock()
+	e.Handling = false
+	w.Header().Set("Content-Type", "application/json")
+	if resp.Ok {
+		e.Enabled = false // single shot
+		e.Handled = true  // ready for removal
+		w.WriteHeader(http.StatusAccepted)
+	} else {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+
+	jm, _ := json.Marshal(resp)
+	w.Write(jm)
+	e.mu.Unlock()
+}
+
+// ---------------- Command Socket ----------------
+
+type CommandReply struct {
+	Ok    bool   `json:"ok"`
+	Error string `json:"error,omitempty"`
+}
+
+func register(cmd Command, mux *DynamicMux) CommandReply {
+	if slices.Contains(cmd.AllowedMethods, http.MethodConnect) || slices.Contains(cmd.AllowedMethods, http.MethodHead) || slices.Contains(cmd.AllowedMethods, http.MethodOptions) || slices.Contains(cmd.AllowedMethods, http.MethodTrace) {
+		return CommandReply{Ok: false, Error: "invalid method"}
+	}
+
+	cmd.Path = strings.TrimSpace(cmd.Path)
+	cmd.Path = sanitize.StripInvisibleRunes(cmd.Path)
+
+	mux.mu.Lock()
+	if _, exists := mux.handlers[cmd.Path]; exists {
+		mux.mu.Unlock()
+		return CommandReply{Ok: false, Error: "path already registered"}
+	}
+	// Preemptive key reservation
+	e := &HandlerEntry{
+		Enabled:  true,
+		Handling: true}
+	// Register before unlocking to prevent double registration in the meantime
+	mux.handlers[cmd.Path] = e
+	mux.mu.Unlock()
+
+	e.mu.Lock()
+	e.Enabled = true
+	e.Handling = false // Set the entry ready for service
+	e.Handled = false
+	e.SocketFile = cmd.SocketFile
+	e.ExternalProcessID = cmd.ExternalProcessID
+	e.Timeout = cmd.Timeout
+
+	if len(cmd.AllowedMethods) == 0 {
+		e.AllowedMethods = []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete}
+	} else {
+		e.AllowedMethods = cmd.AllowedMethods
+	}
+
+	e.mu.Unlock()
+	return CommandReply{Ok: true}
+}
+
+func deregister(cmd Command, mux *DynamicMux) CommandReply {
+	mux.mu.Lock()
+	defer mux.mu.Unlock()
+
+	e := mux.handlers[cmd.Path]
+	if e == nil {
+		return CommandReply{Ok: false, Error: "resource not found"}
+	} else if e.ExternalProcessID != cmd.ExternalProcessID {
+		return CommandReply{Ok: false, Error: "wrong resource owner"}
+	}
+
+	delete(mux.handlers, cmd.Path)
+	return CommandReply{Ok: true}
+}
+
+/* Register /ping resource so external processes/clients can check if server
+ * is running. This resource always exists */
+func registerPing(mux *DynamicMux) {
+	path := "/ping"
+	e := &HandlerEntry{
+		Enabled:           true,
+		Handling:          false,
+		Handled:           false,
+		SocketFile:        "",
+		ExternalProcessID: "",
+		AllowedMethods:    []string{http.MethodGet},
+		Timeout:           -1, // Run forever
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			pingPong := PingPong{
+				Message:   "pong",
+				Status:    status,
+				Now:       time.Now().Format(time.DateTime),
+				ServerUid: serverUID,
+			}
+			jm, _ := json.Marshal(pingPong)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(jm)
+		}),
+	}
+
+	mux.mu.Lock()
+	mux.handlers[path] = e
+	mux.mu.Unlock()
+	logThis(LogLine{"register", "ok", "", path, serverUID, ""})
+}
+
+func listenForClient(listener net.Listener, ctx context.Context, mux *DynamicMux) {
+	defer listener.Close()
+	ticker := time.NewTicker(time.Millisecond)
 	for {
 		select {
 		case <-ctx.Done():
-			log.Println("Context done")
+			ticker.Stop()
+			logThis(LogLine{"conn:accept", "ok", "context done", cmdSockPath, serverUID, ""})
 			return
-		default:
-			if !scanner.Scan() {
-				log.Println("Command pipe closed")
-				return
-			}
 
-			line := scanner.Text()
-			if line == "" {
-				continue
-			}
-			if false == json.Valid([]byte(line)) {
-				log.Printf("Invalid JSON in pipe: %s\n", line)
-				continue
-			}
-
-			var message commandMessage
-			err = json.Unmarshal([]byte(line), &message)
+		case <-ticker.C:
+			conn, err := listener.Accept()
 			if err != nil {
-				log.Printf("Invalid command message in pipe: %s\n", line)
+				logThis(LogLine{"conn:accept", "fail", err.Error(), cmdSockPath, serverUID, ""})
 				continue
 			}
 
-			switch message.Command {
-			case "REGISTER":
-				mux.Register(message.Path, message.PipeTo, message.PipeFrom, message.ExternalProcessID, message.AllowedMethods)
-			case "DEREGISTER":
-				mux.Deregister(message.Path)
-			default:
-				log.Printf("Invalid command: %s\n", line)
-				return
+			handleClient(conn, mux)
+		}
+	}
+}
+
+func handleClient(conn net.Conn, mux *DynamicMux) {
+	defer conn.Close()
+
+	dec := json.NewDecoder(bufio.NewReader(conn))
+	enc := json.NewEncoder(conn)
+
+	var cmd Command
+	err := dec.Decode(&cmd)
+	if err != nil {
+		var reason string
+		if err == io.EOF {
+			reason = "empty string"
+			return
+		} else {
+			reason = err.Error()
+		}
+
+		enc.Encode(CommandReply{Ok: false, Error: reason})
+		return
+	}
+
+	var resp CommandReply
+	switch cmd.Command {
+	case "register":
+		resp = register(cmd, mux)
+	case "deregister":
+		resp = deregister(cmd, mux)
+	default:
+		resp = CommandReply{Ok: false, Error: "unknown command"}
+	}
+
+	if resp.Ok {
+		logThis(LogLine{cmd.Command, "ok", "", cmd.Path, serverUID, cmd.ExternalProcessID})
+	}
+	if err := enc.Encode(resp); err != nil {
+		logThis(LogLine{"client:request:reply", "fail", err.Error(), cmdSockPath, serverUID, cmd.ExternalProcessID})
+		return
+	}
+}
+
+func decreaseResourceLifetime(ctx context.Context, mux *DynamicMux) {
+	ticker := time.NewTicker(time.Second)
+	for {
+		select {
+		case <-ctx.Done():
+			ticker.Stop()
+			logThis(LogLine{"ticker:stop", "ok", "context done", "", serverUID, ""})
+			return
+
+		case <-ticker.C:
+			for k, v := range mux.handlers {
+				v.mu.Lock()
+				if v.Handled || v.Handling || v.Timeout <= 0 || k == "/ping" { // /ping runs forever
+					v.mu.Unlock()
+					continue
+				}
+
+				v.Timeout--
+				v.mu.Unlock()
 			}
 		}
 	}
 }
 
-/*
-MAIN
-*/
+// ---------------- Housekeeping ----------------
+
+func housekeeping(parent context.Context, cancel context.CancelFunc, mux *DynamicMux) {
+	// Give time to register
+	time.Sleep(3 * time.Second)
+	logThis(LogLine{"housekeep", "start", "", "", serverUID, ""})
+	ticker := time.NewTicker(10 * time.Millisecond)
+	for {
+		select {
+		case <-parent.Done():
+			os.Remove(cmdSockPath) // Remove command socket file
+			logThis(LogLine{"shutdown", "ok", "context done", "func housekeeping()", serverUID, ""})
+			return
+
+		case <-ticker.C:
+			mux.mu.Lock()
+			for k, v := range mux.handlers {
+				if k == "/ping" || v.Handling {
+					continue
+				}
+
+				if (!v.Enabled && v.Handled) || v.Timeout <= 0 {
+					reason := ""
+					if !v.Enabled && v.Handled {
+						reason = "handled"
+					} else {
+						reason = "timeout"
+					}
+
+					_, err := os.Stat(v.SocketFile)
+					if err == nil {
+						os.Remove(v.SocketFile)
+						logThis(LogLine{"remove:file", "ok", reason, v.SocketFile, serverUID, v.ExternalProcessID})
+					}
+
+					tempUID := v.ExternalProcessID
+					delete(mux.handlers, k)
+					logThis(LogLine{"remove:resource", "ok", reason, k, serverUID, tempUID})
+				}
+			}
+			mux.mu.Unlock()
+			remaining := len(mux.handlers) - 1 // -1 is /ping (this resource always exists)
+			if remaining == 0 {
+				ticker.Stop()
+				logThis(LogLine{"shutdown", "ok", "no resources available", "", serverUID, ""})
+				status = "shutdown"
+				cancel()
+			}
+		}
+	}
+}
+
+// ---------------- Main ----------------
+
+var httpAddr string
+var cmdSockPath string
+var serverUID string
+var timeoutReadExtProc int
+var help bool
+var maxBodySize int64
+var status string
 
 func main() {
-	port = flag.Int("port", 8888, "The port the server listen for HTTP requests")
-	commandPipePath = flag.String("command-pipe-path", "/tmp/flows-http-server", "The pipe where the server receives commands")
-	help := flag.Bool("help", false, "Show this help")
+	maxBodySize = int64(16 << 20) // 16 MB;
+	tempDir := os.TempDir()
+
+	flag.StringVar(&httpAddr, "address", "0.0.0.0:9090", "Server listens on this address for HTTP requests")
+	flag.StringVar(&cmdSockPath, "command-socket", tempDir+"/server.cmd.sock", "Socket file external processes must use to register resources")
+	flag.StringVar(&serverUID, "server-uid", "", "Server instance unique identifier (no default, mandatory)")
+	flag.IntVar(&timeoutReadExtProc, "timeout-read-external-process", 30, "How long (in seconds) to wait for external process write")
+
+	flag.BoolVar(&help, "help", false, "Show this help")
 	flag.Parse()
-	if *help {
+	if help || serverUID == "" {
 		flag.Usage()
 		return
 	}
 
-	log.SetFlags(log.LstdFlags | log.Lshortfile)
-	mux := NewDynamicMux()
+	status = "starting"
+	if _, err := os.Stat(cmdSockPath); err == nil {
+		os.Remove(cmdSockPath)
+	}
+	// Run server for 1 year
 	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	go watchPipe(ctx, mux, commandPipePath)
-	addr := ":" + strconv.Itoa(*port)
-	server := &http.Server{
-		Addr:    addr,
+	// The server and handler(s) entry(ies)
+	mux := NewMux()
+	httpServer := &http.Server{
+		Addr:    httpAddr,
 		Handler: mux,
 	}
-	go watchHandlers(ctx, mux, server, cancel)
-	listener, err := net.Listen("tcp", addr)
+	// Listen for commands
+	listener, err := net.Listen("unix", cmdSockPath)
 	if err != nil {
-		cancel()
-		log.Fatal(err)
-		return
+		panic(err.Error())
+	} else {
+		logThis(LogLine{"net:listen", "ok", "", cmdSockPath, serverUID, ""})
 	}
 
-	log.Printf("Listening on %s (HTTP/1.1)\n", addr)
-	log.Printf("Named pipe: %s\n", *commandPipePath)
-	err = server.Serve(listener)
-	if err != nil {
-		log.Fatal(err)
+	go func() {
+		listenForClient(listener, ctx, mux)
+	}()
+	// Register ping / heartbeat
+	registerPing(mux)
+	// Start server
+	go func() {
+		logThis(LogLine{"http:listen", "ok", "", httpServer.Addr, serverUID, ""})
+		status = "listening"
+		err := httpServer.ListenAndServe()
+		if err == http.ErrServerClosed {
+			logThis(LogLine{"http:shutdown", "ok", "shutdown", httpServer.Addr, serverUID, ""})
+		} else {
+			logThis(LogLine{"http:shutdown", "fail", err.Error(), httpServer.Addr, serverUID, ""})
+		}
+	}()
+
+	go func() {
+		<-ctx.Done()
+		newCtx, newCancel := context.WithTimeout(context.Background(), time.Duration(timeoutReadExtProc)*time.Second)
+		httpServer.Shutdown(newCtx)
+		newCancel()
+	}()
+
+	go func() {
+		decreaseResourceLifetime(ctx, mux)
+	}()
+
+	go func() {
+		housekeeping(ctx, cancel, mux)
+	}()
+
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	select {
+	case <-sig:
+		logThis(LogLine{"context:cancel", "ok", "os interrupt", "", serverUID, ""})
+		status = "shutdown"
+		cancel()
+
+	case <-ctx.Done():
+		return
 	}
 }
