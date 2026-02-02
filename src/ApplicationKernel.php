@@ -8,7 +8,7 @@ use Collectibles\Collection;
 use Collectibles\Contracts\IO as IOContract;
 use Flows\Container\Container;
 use Flows\Event\Kernel as EventKernel;
-use Flows\Exceptions\HttpServerRunningException;
+use Flows\Exceptions\HttpHandlerServerRunningException;
 use Flows\Facades\Config;
 use Flows\Facades\Logger;
 use Flows\Gates\AndGate;
@@ -79,19 +79,22 @@ class ApplicationKernel
                     // Only one process in offloaded processes, no need for extra work
                     $this->completedProcesses[] = $process;
                 }
-                if (
-                    $gateOrReturn instanceof EventGate
-                    && $gateOrReturn->hasHttpGateEvents()
-                ) {
-                    try {
+                if ($gateOrReturn instanceof EventGate) {
+                    $gateOrReturn->registerEvents();
+                    if ($gateOrReturn->hasHttpEvents()) {
                         // Start HTTP server
-                        (new StartHttpServerProcess())->run($io);
-                    } catch (HttpServerRunningException $e) {
-                        // Already running, carry on
+                        $startHttpServerProcess = new StartHttpServerProcess();
+                        try {
+                            $startHttpServerProcess->run();
+                            $startHttpServerProcess->cleanUp();
+                        } catch (HttpHandlerServerRunningException $e) {
+                            // Already running, carry on
+                            Logger::info('HTTP handler server running');
+                        }
                     }
-                    // Other exceptions will be caught elsewhere (or not)
                 }
-                // Move to the next process
+                // Branch flow
+                $gateOrReturn->waitForEvent();
                 $this->stack->push([
                     $this->processes->getNamed($gateOrReturn()),
                     // With previous process output
@@ -245,6 +248,6 @@ class ApplicationKernel
      */
     public static function getInstanceUUID(): string
     {
-        return INSTANCE_UUID;
+        return INSTANCE_UID;
     }
 }

@@ -38,6 +38,7 @@ use Monolog\Handler\StreamHandler;
 use Monolog\Level;
 use Monolog\Logger;
 use ReflectionClass;
+use RuntimeException;
 
 class BootProcess extends Process
 {
@@ -52,11 +53,13 @@ class BootProcess extends Process
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
+                    define('FLOWS_PACKAGE_NAME', 'rsousa/flows');
+                    define('STARTER_DIRECTORY', getcwd());
                     /**
                      * 
                      * UUID for this flows execution
                      */
-                    define('INSTANCE_UUID', $this->getHexadecimal(32));
+                    define('INSTANCE_UID', $this->getHexadecimal(32));
                     return new Collection();
                 }
 
@@ -70,10 +73,9 @@ class BootProcess extends Process
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     $ds = DIRECTORY_SEPARATOR;
-                    $packageName = InstalledVersions::getRootPackage()['name'];
-                    $vendorDir = InstalledVersions::getInstallPath($packageName);
                     // Where is the code?
-                    $root_dir = dirname($vendorDir, 4) . $ds;
+                    $package_dir = InstalledVersions::getInstallPath(FLOWS_PACKAGE_NAME);
+                    $root_dir = dirname($package_dir, 5) . $ds;
                     $application_dir = $root_dir . "App{$ds}";
                     $config_dir = $application_dir . "Config{$ds}";
                     $log_dir = $application_dir . "Logs{$ds}";
@@ -146,7 +148,15 @@ class BootProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(bool $forSerialization = false): void {}
+                public function cleanUp(bool $forSerialization = false): void
+                {
+                    if (
+                        !$forSerialization
+                        && !chdir(STARTER_DIRECTORY)
+                    ) {
+                        throw new RuntimeException('Could not change directory to starter directory');
+                    }
+                }
             },
             new class implements TaskContract {
                 /**
@@ -201,15 +211,15 @@ class BootProcess extends Process
                             $attribLazy = $provider->getAttributes(Lazy::class);
                             $attribSingleton = $provider->getAttributes(Singleton::class);
                             if ($provider->isInterface()) {
-                                throw new LogicException("$concreteOrProvider: Interfaces are not allowed as service providers");
+                                throw new LogicException("{$concreteOrProvider}: Interfaces are not allowed as service providers");
                             }
 
                             $container->register(
                                 new Abstraction(
                                     $nsAbstractionOrConcrete,
                                     $concreteOrProvider,
-                                    [] === $attribLazy ?: $attribLazy[0]->newInstance()->getIsLazy(),
-                                    [] === $attribSingleton ?: $attribSingleton[0]->newInstance()->getIsSingleton()
+                                    [] === $attribLazy ?: $attribLazy[0]->newInstance()->getIsLazy(), // lazy by default
+                                    [] === $attribSingleton ?: $attribSingleton[0]->newInstance()->getIsSingleton() // singleton by default
                                 )
                             );
                         } else {
@@ -218,8 +228,8 @@ class BootProcess extends Process
                             $container->register(
                                 new Concrete(
                                     $concreteOrProvider,
-                                    [] === $attribLazy ?: $attribLazy[0]->newInstance()->getIsLazy(),
-                                    [] === $attribSingleton ?: $attribSingleton[0]->newInstance()->getIsSingleton()
+                                    [] === $attribLazy ?: $attribLazy[0]->newInstance()->getIsLazy(), // lazy by default
+                                    [] === $attribSingleton ?: $attribSingleton[0]->newInstance()->getIsSingleton() // singleton by default
                                 )
                             );
                         }
@@ -265,7 +275,7 @@ class BootProcess extends Process
                     foreach ($settings as $nsEvent => $nsHandler) {
                         $reflection = new ReflectionClass($nsHandler);
                         if (!$reflection->implementsInterface(EventHandlerContract::class)) {
-                            throw new LogicException('Event handlers must implement ' . EventHandlerContract::class . 'interface');
+                            throw new LogicException('Event handlers must implement ' . EventHandlerContract::class . ' interface');
                         }
 
                         $timing = $reflection->getAttributes(DeferFromFlow::class)
@@ -316,7 +326,7 @@ class BootProcess extends Process
                     foreach ($settings as $nsSubject => $nsObserver) {
                         $reflection = new ReflectionClass($nsObserver);
                         if (!$reflection->implementsInterface(ObserverContract::class)) {
-                            throw new LogicException('Observer must implement ' . ObserverContract::class . 'interface');
+                            throw new LogicException('Observer must implement ' . ObserverContract::class . ' interface');
                         }
 
                         $timing = $reflection->getAttributes(DeferFromFlow::class)
@@ -356,10 +366,6 @@ class BootProcess extends Process
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
-                    if (!chdir($io->get(Config::class)->get('app.directory'))) {
-                        throw new Exception('Could not change to application directory');
-                    }
-
                     $container = $io->get(Container::class);
                     EventFacade::setContainer($container);
                     ObserverFacade::setContainer($container);

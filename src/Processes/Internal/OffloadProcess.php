@@ -30,9 +30,8 @@ class OffloadProcess extends Process
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
-                    $ds = DIRECTORY_SEPARATOR;
                     // change to OffloadedProcess.php script directory
-                    if (!chdir(__DIR__ . "{$ds}..{$ds}..")) {
+                    if (!chdir(dirname(__FILE__, 2))) {
                         throw new RuntimeException('Could not change to OffloadedProcess.php script directory');
                     }
                     if (!is_readable('OffloadedProcess.php')) {
@@ -42,7 +41,15 @@ class OffloadProcess extends Process
                     return $io;
                 }
 
-                public function cleanUp(bool $forSerialization = false): void {}
+                public function cleanUp(bool $forSerialization = false): void
+                {
+                    if (
+                        !$forSerialization
+                        && !chdir(STARTER_DIRECTORY)
+                    ) {
+                        throw new RuntimeException('Could not change directory to starter directory');
+                    }
+                }
             },
             new class implements TaskContract {
                 /**
@@ -64,6 +71,10 @@ class OffloadProcess extends Process
                             $pipes,
                             getcwd()
                         );
+                        if (false === $process) {
+                            throw new RuntimeException("Could not open process OffloadedProcess.php");
+                        }
+
                         stream_set_blocking($pipes[0], false);
                         stream_set_blocking($pipes[1], false);
                         stream_set_blocking($pipes[2], false);
@@ -143,7 +154,7 @@ class OffloadProcess extends Process
                         });
                         // When all processes done, loop terminates itself
                         // check max_execution_time to force process termination
-                        $maxExecutionTime = ini_get('max_execution_time');
+                        $maxExecutionTime = (int) ini_get('max_execution_time');
                         if ($maxExecutionTime > 0) {
                             // 1 ms before script timeout check if process running
                             $reactor->addTimer(

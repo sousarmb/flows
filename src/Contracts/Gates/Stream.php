@@ -7,7 +7,14 @@ namespace Flows\Contracts\Gates;
 interface Stream
 {
     /**
-     * Get stream to listen
+     * Get resource to read/write
+     * 
+     * @return resource
      */
-    public function getStream(): mixed;
+    public function getResource(): mixed;
+
+    /**
+     * Close used resource(s)
+     */
+    public function closeResource(): void;
 }

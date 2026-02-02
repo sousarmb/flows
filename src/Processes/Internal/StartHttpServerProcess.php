@@ -9,10 +9,12 @@ use Collectibles\Contracts\IO as IOContract;
 use Composer\InstalledVersions;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Exceptions\CouldNotStartHttpServerException;
-use Flows\Exceptions\HttpServerRunningException;
+use Flows\Exceptions\HttpHandlerServerRunningException;
 use Flows\Facades\Config;
 use Flows\Facades\Logger;
 use Flows\Processes\Process;
+use Flows\Traits\Echos;
+use Flows\Traits\RandomString;
 use RuntimeException;
 
 class StartHttpServerProcess extends Process
@@ -21,38 +23,48 @@ class StartHttpServerProcess extends Process
     {
         $this->tasks = [
             new class implements TaskContract {
+                use Echos;
                 /**
                  * @param IOContract|Collection|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
-                    $commandPipe = Config::getApplicationSettings()->get('http.server.command_pipe_path');
-                    if (file_exists($commandPipe)) {
-                        throw new HttpServerRunningException();
+                    if ($this->pingHandlerServer()) {
+                        throw new HttpHandlerServerRunningException();
                     }
 
                     $ds = DIRECTORY_SEPARATOR;
-                    $packageName = InstalledVersions::getRootPackage()['name'];
-                    $vendorDir = InstalledVersions::getInstallPath($packageName);
-                    $binDir = "{$vendorDir}{$ds}bin";
-                    // change to HTTP server runtime directory
+                    $packageDir = InstalledVersions::getInstallPath(FLOWS_PACKAGE_NAME);
+                    $binDir = dirname($packageDir, 4) . "{$ds}bin";
                     if (!chdir($binDir)) {
-                        throw new RuntimeException('Could not change to HTTP server runtime directory');
+                        throw new RuntimeException("Could not change to HTTP server runtime directory: {$binDir}");
                     }
-                    if (!is_executable('http-server')) {
-                        throw new RuntimeException('HTTP server runtime not executable');
-                    }
-                    if (!posix_mkfifo($commandPipe, 0664)) {
-                        throw new RuntimeException("Could not create command pipe file: {$commandPipe}");
+                    if (
+                        !is_readable('http-server')
+                        || !is_executable('http-server')
+                    ) {
+                        throw new RuntimeException('HTTP server runtime not found, not readable or not executable');
                     }
 
+                    $cmdSocketPath = Config::getApplicationSettings()->get('http.server.command_socket_path');
+                    @unlink($cmdSocketPath); // fresh start
                     return $io;
                 }
 
-                public function cleanUp(bool $forSerialization = false): void {}
+                public function cleanUp(bool $forSerialization = false): void
+                {
+                    if (
+                        !$forSerialization
+                        && !chdir(STARTER_DIRECTORY)
+                    ) {
+                        throw new RuntimeException('Could not change directory to starter directory');
+                    }
+                }
             },
             new class implements TaskContract {
+                use Echos;
+                use RandomString;
                 /**
                  * @param IOContract|Collection|null $io
                  * @return IOContract|null
@@ -65,19 +77,32 @@ class StartHttpServerProcess extends Process
                         2 => ['file', Config::getLogDirectory() . 'http-server.log', 'a'], // STDERR
                     ];
                     $settings = Config::getApplicationSettings();
-                    $port = $settings()->get('http.server.listen_on');
-                    $commandPipe = $settings()->get('http.server.command_pipe_path');
+                    $address = $settings->get('http.server.address');
+                    $cmdSocketPath = $settings->get('http.server.command_socket_path');
+                    $externalProcessReadTimeout = $settings->get('http.server.timeout_read_external_process');
+                    $uid = $this->getHexadecimal(32);
                     $httpServer = proc_open(
-                        ['./http-server', '--port', $port, '--pipe-file', $commandPipe],
+                        [
+                            './http-server',
+                            '--address',
+                            $address,
+                            '--command-socket',
+                            $cmdSocketPath,
+                            '--server-uid',
+                            $uid,
+                            '--timeout-read-external-process',
+                            $externalProcessReadTimeout
+                        ],
                         $descriptorSpec,
                         $pipes,
                         getcwd()
                     );
                     if (false === $httpServer) {
+                        @unlink($cmdSocketPath);
                         throw new CouldNotStartHttpServerException();
                     }
 
-                    Logger::info("Started HTTP server on port {$port} with command pipe {$commandPipe}");
+                    Logger::info("Started HTTP handler server: address {$address}, command socket {$cmdSocketPath}, unique identifier {$uid}");
                     return $io;
                 }
 
