@@ -6,7 +6,7 @@ namespace App\Events;
 
 use Flows\Gates\Events\HttpEvent;
 
-readonly class <!--name-->GateEvent extends HttpEvent
+class <!--name-->GateEvent extends HttpEvent
 {
     public function __construct()
     {
@@ -16,29 +16,24 @@ readonly class <!--name-->GateEvent extends HttpEvent
     }
 
     /**
-     *
-     * Resolve is called when data is available on the stream 
+     * Resolve is called when a request for this resource arrives 
      * 
-     * @param resource $data Stream whith the request (JSON encoded) data the HTTP server received
+     * @param string $data JSON encoded string with the request data the HTTP handler server received
      * @return bool TRUE => event wins gate race condition; FALSE => try again when data available on the $data stream
      */
     public function resolve($data = null): bool {
         /**
-         * $data is the stream where the HTTP server writes
          * Example usage:
          * 
-         * $temp = fgets($data);
-         * $json = json_decode($temp, true);
+         * $json = json_decode($data, true);
          * if (
          *     array_key_exists('data', $json)
          *     && $json['data'] === 'good data'
          * ) {
-         *    $this->accepted(200, "Accepted", "Flow is going to resume");
-         *    return true;
+         *    return $this->accepted(200, "Accepted", "Flow is going to resume");
          * }
          *
-         * $this->tryAgain(400, "Bad data", "");
-         * return false;
+         * return $this->tryAgain(400, "Bad data", "");
          */
     }
 }

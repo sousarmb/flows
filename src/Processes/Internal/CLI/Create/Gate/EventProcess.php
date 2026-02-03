@@ -109,7 +109,7 @@ class EventProcess extends CLICommand
                         $fileContents
                     );
                     $ioFile = sprintf(
-                        "%sProcesses{$ds}Gates{$ds}%sGate.php",
+                        "%sEvents{$ds}%sGateEvent.php",
                         $io->getScaffoldDestinationDirectory(),
                         $io->get('argv.name')
                     );

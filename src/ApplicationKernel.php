@@ -92,9 +92,10 @@ class ApplicationKernel
                             Logger::info('HTTP handler server running');
                         }
                     }
+
+                    $gateOrReturn->waitForEvent();
                 }
                 // Branch flow
-                $gateOrReturn->waitForEvent();
                 $this->stack->push([
                     $this->processes->getNamed($gateOrReturn()),
                     // With previous process output

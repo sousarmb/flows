@@ -31,7 +31,7 @@ class OffloadProcess extends Process
                 public function __invoke(?IOContract $io = null): ?IOContract
                 {
                     // change to OffloadedProcess.php script directory
-                    if (!chdir(dirname(__FILE__, 2))) {
+                    if (!chdir(dirname(__FILE__, 3))) {
                         throw new RuntimeException('Could not change to OffloadedProcess.php script directory');
                     }
                     if (!is_readable('OffloadedProcess.php')) {
