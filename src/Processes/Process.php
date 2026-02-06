@@ -142,7 +142,7 @@ abstract class Process implements CleanUpContract
 
                 $undo = $task->setIO($io)();
                 $this->makeObservation($task);
-                if ($undo > 0) {
+                if ($undo > 0) { // 0 => no roll back, continue task processing
                     while ($undo && [$savedPosition, $io] = $this->state->pop()) {
                         $undo--;
                     }

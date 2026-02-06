@@ -59,7 +59,7 @@ class BootProcess extends Process
                      * 
                      * UUID for this flows execution
                      */
-                    define('INSTANCE_UID', $this->getHexadecimal(32));
+                    define('INSTANCE_UID', $this->getHexadecimal(8));
                     return new Collection();
                 }
 

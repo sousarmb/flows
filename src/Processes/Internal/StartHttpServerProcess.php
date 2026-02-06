@@ -80,7 +80,7 @@ class StartHttpServerProcess extends Process
                     $address = $settings->get('http.server.address');
                     $cmdSocketPath = $settings->get('http.server.command_socket_path');
                     $externalProcessReadTimeout = $settings->get('http.server.timeout_read_external_process');
-                    $uid = $this->getHexadecimal(32);
+                    $uid = $this->getHexadecimal(8);
                     $httpServer = proc_open(
                         [
                             './http-server',

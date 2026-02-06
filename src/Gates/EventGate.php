@@ -90,7 +90,7 @@ abstract class EventGate extends Gate implements EventGateContract
             ) {
                 $reactor->onReadable(
                     $event->getResource(),
-                    function ($reactor) use ($event) {
+                    function ($stream, $reactor) use ($event) {
                         $client = $event->acceptClient();
                         $data = fgets($client);
                         if ($event->resolve($data)) {

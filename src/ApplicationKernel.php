@@ -74,7 +74,6 @@ class ApplicationKernel
                 $gateOrReturn instanceof XorGate
                 || $gateOrReturn instanceof EventGate
             ) {
-                $process->cleanUp();
                 if (!static::isOffloadedProcess()) {
                     // Only one process in offloaded processes, no need for extra work
                     $this->completedProcesses[] = $process;
@@ -92,7 +91,6 @@ class ApplicationKernel
                             Logger::info('HTTP handler server running');
                         }
                     }
-
                     $gateOrReturn->waitForEvent();
                 }
                 // Branch flow
@@ -103,6 +101,8 @@ class ApplicationKernel
                     // And no source process, nothing to resume, just go forward to next process
                     null
                 ]);
+                // Finish the process
+                $process->cleanUp();
             } elseif ($gateOrReturn instanceof OffloadAndGate) {
                 $offloadOrProcesses = $gateOrReturn();
                 if (empty($offloadOrProcesses)) {
@@ -142,7 +142,7 @@ class ApplicationKernel
                     // No gate, nowhere to go, end the flow
                     $end = true;
                 }
-
+                // Finish the process
                 $process->cleanUp();
                 if (!static::isOffloadedProcess()) {
                     // Only one process in offloaded processes, no need for extra work

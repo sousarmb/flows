@@ -13,7 +13,7 @@ abstract class Facade
 
     /**
      *
-     * Set the façade's container instance
+     * Set the facade's container instance
      *
      * @param Container $container
      */
@@ -25,7 +25,7 @@ abstract class Facade
 
     /**
      *
-     * Is the façade ready to be used?
+     * Is the facade ready to be used?
      *
      * @return bool
      */
