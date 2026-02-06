@@ -155,7 +155,6 @@ class ApplicationKernel
     }
 
     /**
-     * 
      * Process the flow
      * 
      * @param string $nsInitialProcess Start with this process
@@ -222,7 +221,6 @@ class ApplicationKernel
     }
 
     /**
-     * 
      * Running process outside of main process (offloaded)?
      * 
      * @return bool TRUE if process is offloaded, FALSE otherwise
@@ -233,7 +231,6 @@ class ApplicationKernel
     }
 
     /**
-     * 
      * Stop all work on next iteration
      */
     public static function fullStop(): void
@@ -242,7 +239,6 @@ class ApplicationKernel
     }
 
     /**
-     * 
      * Get UUID for this flows execution
      * 
      * @return string Generated from cryptographically secure random bytes

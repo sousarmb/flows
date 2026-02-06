@@ -23,7 +23,6 @@ class StdErrMonologHandler extends AbstractHandler
     }
 
     /**
-     * 
      * Notify the main process something happened using STDERR (which 
      * it should be listening to inside the reactor)
      */

@@ -12,7 +12,6 @@ abstract class Facade
     private static bool $ready;
 
     /**
-     *
      * Set the facade's container instance
      *
      * @param Container $container
@@ -24,7 +23,6 @@ abstract class Facade
     }
 
     /**
-     *
      * Is the facade ready to be used?
      *
      * @return bool
@@ -35,7 +33,6 @@ abstract class Facade
     }
 
     /**
-     * 
      * Get the service instance from the container. 
      * Must be defined in child class.
      * Acts as getting the service class from the container.

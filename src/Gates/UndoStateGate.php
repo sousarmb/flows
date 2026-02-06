@@ -12,7 +12,6 @@ namespace Flows\Gates;
 abstract class UndoStateGate extends Gate
 {
     /**
-     * 
      * @return int 0 don't perform undo, just follow through with process, 1+ pop n states from stack
      */
     abstract public function __invoke(): int;

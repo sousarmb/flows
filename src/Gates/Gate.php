@@ -33,7 +33,6 @@ abstract class Gate implements GateContract, CleanUpContract
     }
 
     /**
-     * 
      * @return array<int, mixed>
      */
     public function __sleep(): array
