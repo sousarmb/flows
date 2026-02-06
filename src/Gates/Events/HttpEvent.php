@@ -10,6 +10,7 @@ use Flows\Contracts\Gates\Stream as StreamContract;
 use Flows\Facades\Config;
 use Flows\Facades\Logger;
 use Flows\Helpers\ResponseMessageToHttpRequest;
+use Flows\Traits\Echos;
 use Flows\Traits\Files;
 use Flows\Traits\RandomString;
 use RuntimeException;
@@ -20,8 +21,9 @@ use RuntimeException;
  */
 abstract class HttpEvent implements GateEventContract, HttpEventContract, StreamContract
 {
-    use RandomString;
+    use Echos;
     use Files;
+    use RandomString;
 
     const TIMEOUT = 600; // 5 minutes
 
@@ -54,6 +56,11 @@ abstract class HttpEvent implements GateEventContract, HttpEventContract, Stream
      * @var int $timeout In seconds, how long the HTTP server keeps this resource, default is TIMEOUT seconds
      */
     protected int $timeout;
+
+    /**
+     * @var bool $resourceClosed Prevent wait forever on socket connect to server when cleaning up resource.
+     */
+    private bool $resourceClosed = false;
 
     /**
      * Register event/resource with HTTP server
@@ -192,7 +199,12 @@ abstract class HttpEvent implements GateEventContract, HttpEventContract, Stream
      */
     public function closeResource(): void
     {
-        $this->deregisterPathWithHandlerServer();
+        if ($this->resourceClosed) {
+            return;
+        }
+        if ($this->pingHandlerServer()) {
+            $this->deregisterPathWithHandlerServer();
+        }
         if (
             isset($this->handlerSrvSock)
             && is_resource($this->handlerSrvSock)
@@ -201,6 +213,8 @@ abstract class HttpEvent implements GateEventContract, HttpEventContract, Stream
             @unlink($this->handlerSrvSockFile);
             Logger::info("Closed socket: {$this->handlerSrvSockFile}");
         }
+
+        $this->resourceClosed = true;
     }
 
     /**

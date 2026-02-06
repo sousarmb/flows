@@ -156,7 +156,7 @@ func handleWithoutBody(req *RequestMsg, e *HandlerEntry) (ResponseMsg, error) {
 		Ok:          true,
 		Code:        0,
 		Status:      "success",
-		Message:     "Set message body",
+		Message:     "",
 		InstanceUID: e.ExternalProcessID}, nil
 }
 

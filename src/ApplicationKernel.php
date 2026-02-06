@@ -74,7 +74,6 @@ class ApplicationKernel
                 $gateOrReturn instanceof XorGate
                 || $gateOrReturn instanceof EventGate
             ) {
-                $process->cleanUp();
                 if (!static::isOffloadedProcess()) {
                     // Only one process in offloaded processes, no need for extra work
                     $this->completedProcesses[] = $process;
@@ -92,9 +91,9 @@ class ApplicationKernel
                             Logger::info('HTTP handler server running');
                         }
                     }
+                    $gateOrReturn->waitForEvent();
                 }
                 // Branch flow
-                $gateOrReturn->waitForEvent();
                 $this->stack->push([
                     $this->processes->getNamed($gateOrReturn()),
                     // With previous process output
@@ -102,6 +101,8 @@ class ApplicationKernel
                     // And no source process, nothing to resume, just go forward to next process
                     null
                 ]);
+                // Finish the process
+                $process->cleanUp();
             } elseif ($gateOrReturn instanceof OffloadAndGate) {
                 $offloadOrProcesses = $gateOrReturn();
                 if (empty($offloadOrProcesses)) {
@@ -141,7 +142,7 @@ class ApplicationKernel
                     // No gate, nowhere to go, end the flow
                     $end = true;
                 }
-
+                // Finish the process
                 $process->cleanUp();
                 if (!static::isOffloadedProcess()) {
                     // Only one process in offloaded processes, no need for extra work
@@ -154,7 +155,6 @@ class ApplicationKernel
     }
 
     /**
-     * 
      * Process the flow
      * 
      * @param string $nsInitialProcess Start with this process
@@ -221,7 +221,6 @@ class ApplicationKernel
     }
 
     /**
-     * 
      * Running process outside of main process (offloaded)?
      * 
      * @return bool TRUE if process is offloaded, FALSE otherwise
@@ -232,7 +231,6 @@ class ApplicationKernel
     }
 
     /**
-     * 
      * Stop all work on next iteration
      */
     public static function fullStop(): void
@@ -241,7 +239,6 @@ class ApplicationKernel
     }
 
     /**
-     * 
      * Get UUID for this flows execution
      * 
      * @return string Generated from cryptographically secure random bytes

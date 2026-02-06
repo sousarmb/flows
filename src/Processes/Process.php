@@ -101,7 +101,6 @@ abstract class Process implements CleanUpContract
     }
 
     /**
-     * 
      * @return array<int|null, int> Where 0 => current task index or null if 
      *                              process completed, 1 => task count
      */
@@ -142,7 +141,7 @@ abstract class Process implements CleanUpContract
 
                 $undo = $task->setIO($io)();
                 $this->makeObservation($task);
-                if ($undo > 0) {
+                if ($undo > 0) { // 0 => no roll back, continue task processing
                     while ($undo && [$savedPosition, $io] = $this->state->pop()) {
                         $undo--;
                     }
@@ -169,7 +168,6 @@ abstract class Process implements CleanUpContract
     }
 
     /**
-     * 
      * Start from first task
      *
      * @param Collection|null $io
@@ -210,7 +208,6 @@ abstract class Process implements CleanUpContract
     }
 
     /**
-     * 
      * Prepare process and tasks for serialization. 
      * Serialize position, task count and tasks members.
      * 
@@ -223,7 +220,6 @@ abstract class Process implements CleanUpContract
     }
 
     /**
-     * 
      * Re-bind event and observer kernel if container ready.
      * Start savepoint stack.
      */
@@ -239,7 +235,6 @@ abstract class Process implements CleanUpContract
     }
 
     /**
-     * 
      * Check if class is allowed as a process task class
      * 
      * @param object $task To assert class
