@@ -125,6 +125,9 @@ class ProcessProcess extends CLICommand
                         foreach ($argvTasks as $task) {
                             $useList .= "use App\\Processes\\Tasks\\{$task};" . PHP_EOL;
                             $taskList .= "\t\t\t{$task}::class," . PHP_EOL;
+
+                            $binDir = dirname(__FILE__, 8) . "{$ds}bin{$ds}";
+                            exec("php {$binDir}flows create:task --name={$task}");
                         }
                         $fileContents = str_replace(
                             ['<!--use-list-->', '<!--task-list-->'],
