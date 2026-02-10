@@ -18,7 +18,7 @@ interface Gate extends CleanUpContract
 
     /**
      *
-     * @return IO|null
+     * @return IOContract|null
      */
     public function getIO(): ?IOContract ;
 }

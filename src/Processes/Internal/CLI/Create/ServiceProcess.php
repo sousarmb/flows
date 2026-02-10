@@ -374,16 +374,18 @@ class ServiceProcess extends CLICommand
                     }
 
                     $filesWritten = [
-                        $serviceProviderMapFile,
-                        $io->get('newservicefile'),
+                        '', // new line (lazy, i know)
+                        " Registration: {$serviceProviderMapFile}",
+                        " Service file: {$io->get('newservicefile')}",
+                        '',
                     ];
                     if ('abstract' === $io->get('argv.implementation')) {
-                        $filesWritten[] = $io->get('newcontractfile');
-                        $filesWritten[] = $io->get('newserviceproviderfile');
+                        $filesWritten[] = " Contract file: {$io->get('newcontractfile')}";
+                        $filesWritten[] = " Provider file: {$io->get('newserviceproviderfile')}";
                     }
 
                     return new CommandOutput(
-                        'Service created successfully [' . implode(', ', $filesWritten) . ']',
+                        'Service created successfully [' . implode(PHP_EOL, $filesWritten) . ']',
                         true
                     );
                 }

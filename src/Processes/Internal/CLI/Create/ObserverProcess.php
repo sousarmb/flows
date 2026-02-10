@@ -225,11 +225,13 @@ class ObserverProcess extends CLICommand
                     }
 
                     $filesWritten = [
-                        $subjectObserverMapFile,
-                        $io->get('newobserverfile')
+                        '', // new line (lazy, i know)
+                        " Registration: {$subjectObserverMapFile}",
+                        " Observer file: {$io->get('newobserverfile')}",
+                        ''
                     ];
                     return new CommandOutput(
-                        'Observer created successfully [' . implode(', ', $filesWritten) . ']',
+                        'Observer created successfully [' . implode(PHP_EOL, $filesWritten) . ']',
                         true
                     );
                 }

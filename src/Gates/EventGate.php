@@ -177,4 +177,6 @@ abstract class EventGate extends Gate implements EventGateContract
     {
         return (bool)count(array_filter($this->events, fn($evt) => $evt instanceof StreamContract));
     }
+
+    abstract public function registerEvents(): void;
 }

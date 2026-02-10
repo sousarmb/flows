@@ -87,7 +87,7 @@ class IoProcess extends CLICommand
                     }
 
                     return new CommandOutput(
-                        "Task created successfully [{$ioFile}]",
+                        "DTO created successfully [{$ioFile}]",
                         true
                     );
                 }

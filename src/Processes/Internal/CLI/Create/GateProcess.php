@@ -118,7 +118,7 @@ class GateProcess extends CLICommand
                     }
 
                     return new CommandOutput(
-                        "Task created successfully [{$ioFile}]",
+                        strtoupper($io->get('argv.type')) . " gate created successfully [{$ioFile}]",
                         true
                     );
                 }

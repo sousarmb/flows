@@ -108,17 +108,17 @@ class EventProcess extends CLICommand
                         $io->get('argv.name'),
                         $fileContents
                     );
-                    $ioFile = sprintf(
+                    $eventFile = sprintf(
                         "%sEvents{$ds}%sGateEvent.php",
                         $io->getScaffoldDestinationDirectory(),
                         $io->get('argv.name')
                     );
-                    if (false === file_put_contents($ioFile, $fileContents)) {
-                        throw new RuntimeException("Could not write file {$ioFile}");
+                    if (false === file_put_contents($eventFile, $fileContents)) {
+                        throw new RuntimeException("Could not write file {$eventFile}");
                     }
 
                     return new CommandOutput(
-                        "Task created successfully [{$ioFile}]",
+                        "Event created successfully [{$eventFile}]",
                         true
                     );
                 }
