@@ -159,7 +159,7 @@ class ApplicationKernel
      * 
      * @param string $nsInitialProcess Start with this process
      * @param ?IOContract $io Give it this input
-     * @return IO|null
+     * @return IOContract|null
      */
     public function process(
         string $nsInitialProcess,

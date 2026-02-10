@@ -72,12 +72,12 @@ function help(string $commandDirectory, ?string $showAs = null): void
     }
 }
 
-function main(array $argv, int $argc): bool
+function main(array $argv, int $argc): int
 {
     if (!isset($argv[1])) {
         echo 'Available commands are:' . PHP_EOL;
         help('Create');
-        return true;
+        return 1;
     }
 
     $tmp = explode(':', strtolower($argv[1]), 3);
@@ -85,7 +85,7 @@ function main(array $argv, int $argc): bool
     if (1 === $count) {
         echo 'Available commands are:' . PHP_EOL;
         help('Create');
-        return true;
+        return 1;
     }
     if (3 === $count) {
         list($command, $componentName, $processName) = $tmp;
@@ -110,7 +110,7 @@ function main(array $argv, int $argc): bool
     if (isset($argv[2]) && $argv[2] === 'help') {
         echo $process->getHelp() . PHP_EOL;
         printArguments($process);
-        return true;
+        return 0;
     }
     // Check process arguments
     $parsedArguments = parseCommandArguments(
@@ -119,7 +119,7 @@ function main(array $argv, int $argc): bool
     if (!$process->checkArguments($parsedArguments)) {
         echo PHP_EOL . 'Invalid arguments. Valid arguments:' . PHP_EOL;
         printArguments($process);
-        return false;
+        return 1;
     }
     // Run the process
     $input = new CLICollection();
@@ -130,12 +130,12 @@ function main(array $argv, int $argc): bool
     $output = $process->run($input);
     if (null === $output) {
         echo PHP_EOL . 'Command output is null' . PHP_EOL;
-        return false;
+        return 1;
     }
 
     echo PHP_EOL . 'Command exit status: ' . PHP_EOL . ($output->get('success') ? 'Success' : 'Fail') . PHP_EOL;
     echo PHP_EOL . 'Command output: ' . PHP_EOL . $output->get('message') . PHP_EOL . PHP_EOL;
-    return $output->get('success');
+    return $output->get('success') ? 0 : 1;
 }
 
-exit((int)main($argv, $argc));
+exit(main($argv, $argc));

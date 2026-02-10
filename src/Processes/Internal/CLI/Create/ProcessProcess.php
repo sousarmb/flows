@@ -96,7 +96,7 @@ class ProcessProcess extends CLICommand
                         } elseif (!$this->classNameIsValid($taskName)) {
                             echo PHP_EOL . 'Invalid string for task class name' . PHP_EOL;
                         } elseif ($this->classFileExists($taskName, 'task', $io->getScaffoldDestinationDirectory())) {
-                            throw PHP_EOL . 'Task class file exists' . PHP_EOL;
+                            echo PHP_EOL . 'Task class file exists' . PHP_EOL;
                         } else {
                             $io->add("{$taskName}Task", 'argv.tasks');
                         }
@@ -115,6 +115,7 @@ class ProcessProcess extends CLICommand
                 {
                     $ds = DIRECTORY_SEPARATOR;
                     $fileContents = file_get_contents($io->getScaffoldTemplatesDirectory() . "{$ds}process.php.template");
+                    $outputMessage = [];
                     if ($io->has('argv.tasks')) {
                         $argvTasks = $io->get('argv.tasks');
                         if (is_string($argvTasks)) {
@@ -122,12 +123,11 @@ class ProcessProcess extends CLICommand
                         }
 
                         $useList = $taskList = '';
+                        $binDir = dirname(__FILE__, 8) . "{$ds}bin{$ds}";
                         foreach ($argvTasks as $task) {
                             $useList .= "use App\\Processes\\Tasks\\{$task};" . PHP_EOL;
                             $taskList .= "\t\t\t{$task}::class," . PHP_EOL;
-
-                            $binDir = dirname(__FILE__, 8) . "{$ds}bin{$ds}";
-                            exec("php {$binDir}flows create:task --name={$task}");
+                            $this->createTaskClassFile($task, $binDir, $outputMessage);
                         }
                         $fileContents = str_replace(
                             ['<!--use-list-->', '<!--task-list-->'],
@@ -156,10 +156,27 @@ class ProcessProcess extends CLICommand
                         throw new RuntimeException("Could not write file {$processFile}");
                     }
 
+                    $outputMessage[] = "Process created successfully [{$processFile}]";
                     return new CommandOutput(
-                        "Process created successfully [{$processFile}]",
+                        implode(PHP_EOL, $outputMessage),
                         true
                     );
+                }
+
+                private function createTaskClassFile(
+                    string $task,
+                    string $binDir,
+                    array &$outputMessage
+                ): void {
+                    $ds = DIRECTORY_SEPARATOR;
+                    $output = [];
+                    $result = 99;
+                    // Prevent double "task" suffix (already added by code generation)
+                    $temp = strrpos($task, 'Task') === false
+                        ? $task
+                        : substr($task, 0, strrpos($task, 'Task'));
+                    exec("php {$binDir}flows create:task name={$temp}", $output, $result);
+                    $outputMessage[] = $result === 0 ? "{$output[8]}" : "{$output[4]}";
                 }
 
                 public function cleanUp(bool $forSerialization = false): void {}

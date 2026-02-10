@@ -327,7 +327,7 @@ If your business logic requires a process to wait until some condition happens, 
 
 Event gates [group conditions](https://github.com/sousarmb/flows-example-app/blob/main/App/Processes/Gates/WaitForFileModificationGate.php) that need to happen for a process to resume. The gate waits for one of multiple external conditions to resolve first (`$winner` member), then branchs accordingly. 
 
-You write the gate event classes.
+Extend [`EventGate`](https://github.com/sousarmb/flows/blob/main/src/Gates/EventGate.php) class to write your own gate event classes.
 
 A wait timeout (`$expires` member) for the gate is always set. If no event resolves during this timeout, a default branch must be selected. Think of it as a switch default.
 ### Save/Undo process state

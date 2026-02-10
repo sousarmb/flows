@@ -11,7 +11,7 @@ interface Task extends CleanUp
     /**
      *
      * @param IOContract|null $io
-     * @return IO|null
+     * @return IOContract|null
      */
     public function __invoke(?IOContract $io = null): ?IOContract;
 }

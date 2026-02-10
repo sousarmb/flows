@@ -180,12 +180,14 @@ class EventProcess extends CLICommand
                     }
 
                     $filesWritten = [
-                        $eventHandlerMapFile,
-                        $io->get('neweventfile'),
-                        $io->get('newhandlerfile')
+                        '', // new line (lazy, i know)
+                        " Registration: {$eventHandlerMapFile}",
+                        " Event file: {$io->get('neweventfile')}",
+                        " Handler file: {$io->get('newhandlerfile')}",
+                        '',
                     ];
                     return new CommandOutput(
-                        'Event created successfully [' . implode(', ', $filesWritten) . ']',
+                        'Event created successfully [' . implode(PHP_EOL, $filesWritten) . ']',
                         true
                     );
                 }

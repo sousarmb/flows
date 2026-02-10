@@ -48,7 +48,7 @@ class BootProcess extends Process
             new class implements TaskContract {
                 use RandomString;
                 /**
-                 * @param IOContract|Collection|null $io
+                 * @param IOContract|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
@@ -67,7 +67,7 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|Collection|null $io
+                 * @param IOContract|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
@@ -101,7 +101,7 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|Collection|null $io
+                 * @param IOContract|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
@@ -130,7 +130,7 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|Collection|null $io
+                 * @param IOContract|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
@@ -160,7 +160,7 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|Collection|null $io
+                 * @param IOContract|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
@@ -188,7 +188,7 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|Collection|null $io
+                 * @param IOContract|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
@@ -259,7 +259,7 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|Collection|null $io
+                 * @param IOContract|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
@@ -310,7 +310,7 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|Collection|null $io
+                 * @param IOContract|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
@@ -361,7 +361,7 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|Collection|null $io
+                 * @param IOContract|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract

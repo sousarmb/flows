@@ -13,7 +13,6 @@ abstract class Gate implements GateContract, CleanUpContract
     protected ?IOContract $io;
 
     /**
-     *
      * @param IOContract|null $io
      * @return self
      */
@@ -24,10 +23,9 @@ abstract class Gate implements GateContract, CleanUpContract
     }
 
     /**
-     *
-     * @return IO|null
+     * @return IOContract|null
      */
-    public function getIO(): ?IOContract 
+    public function getIO(): ?IOContract
     {
         return $this->io;
     }
@@ -39,4 +37,6 @@ abstract class Gate implements GateContract, CleanUpContract
     {
         return ['io'];
     }
+
+    abstract public function cleanUp(bool $forSerialization = false): void;
 }

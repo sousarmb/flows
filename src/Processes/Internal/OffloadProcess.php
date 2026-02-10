@@ -25,7 +25,7 @@ class OffloadProcess extends Process
         $this->tasks = [
             new class implements TaskContract {
                 /**
-                 * @param IOContract|Collection|null $io
+                 * @param IOContract|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
@@ -53,7 +53,7 @@ class OffloadProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|Collection|null $io
+                 * @param IOContract|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract
@@ -92,7 +92,7 @@ class OffloadProcess extends Process
                 private array $processes;
                 private bool $default_stop_on_offload_error = true;
                 /**
-                 * @param IOContract|Collection|null $io
+                 * @param IOContract|null $io
                  * @return IOContract|null
                  */
                 public function __invoke(?IOContract $io = null): ?IOContract

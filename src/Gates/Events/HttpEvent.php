@@ -188,7 +188,7 @@ abstract class HttpEvent implements GateEventContract, HttpEventContract, Stream
             STREAM_SERVER_BIND | STREAM_SERVER_LISTEN
         );
         if (!$this->handlerSrvSock) {
-            throw new RuntimeException("Server creation failed: $errstr ($errno)\n");
+            throw new RuntimeException("Server creation failed: {$errstr} ({$errno})");
         }
         // Non-blocking server socket
         stream_set_blocking($this->handlerSrvSock, false);
@@ -265,7 +265,7 @@ abstract class HttpEvent implements GateEventContract, HttpEventContract, Stream
         $resp = new ResponseMessageToHttpRequest(false, $code, $status, $message);
         if (false === fwrite($this->client, json_encode($resp) . "\n")) {
             $this->closeResource();
-            throw new RuntimeException("Could not write \"try again\" message to handler server");
+            throw new RuntimeException('Could not write "try again" message to handler server');
         }
 
         fflush($this->client);
@@ -280,4 +280,6 @@ abstract class HttpEvent implements GateEventContract, HttpEventContract, Stream
 
         return $this->client;
     }
+
+    abstract public function resolve(mixed $mixed = null): bool;
 }
