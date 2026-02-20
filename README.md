@@ -321,15 +321,72 @@ When the child process complete, their output is collected and the parent proces
 ### Process serialization (WIP)
 Process and task classes implement `__sleep()` and `__wakeup()` to allow serialization. In theory a workflow can be "frozen" in time to be stored in a database, reloaded and resumed at any later time. Work in progress.
 ### React to external events
-One of your processes needs an external action to complete: a record written in a database table, a mail to arrive, a filesystem file updated, etc. 
+One of your processes needs an external action to complete: a record written in a database table, a mail to arrive, a filesystem file updated, an HTTP request received, etc.
 
 If your business logic requires a process to wait until some condition happens, you can write an event gate to handle this case.
 
-Event gates [group conditions](https://github.com/sousarmb/flows-example-app/blob/main/App/Processes/Gates/WaitForFileModificationGate.php) that need to happen for a process to resume. The gate waits for one of multiple external conditions to resolve first (`$winner` member), then branchs accordingly. 
+**Event gates** group conditions that need to happen for a process to resume. The gate waits for one of multiple external conditions to resolve first (stored in `$winner`), then branches accordingly.
 
-Extend [`EventGate`](https://github.com/sousarmb/flows/blob/main/src/Gates/EventGate.php) class to write your own gate event classes.
+Extend [`EventGate`](https://github.com/sousarmb/flows/blob/main/src/Gates/EventGate.php) class to write your own event gate.
+#### Event Types
+`EventGate` supports three types of events:
+1. **Frequent Events** - Resolve on a recurring timer (polling)
+   - Best for checking conditions at regular intervals
+   - No failure handling available
+2. **Stream Events** - Monitor file or network streams for data
+   - Examples: files, sockets, pipes
+   - Supports failure handling (with `failCount` and `failAction`)
+3. **HTTP Events** - Accept external HTTP requests through an HTTP handler server
+   - Best for webhooks or external service callbacks
+   - The handler server is started automatically when an HTTP event is registered
+   - Supports failure handling (with `failCount` and `failAction`)
+#### Setting Up Events
+Register events in the `registerEvents()` method using `pushEvent()`:
+```php
+protected function registerEvents(): void
+{
+    $this->pushEvent($frequentEvent);
+    $this->pushEvent($streamEvent, failCount: 3, failAction: Behaviour::Exit);
+    $this->pushEvent($httpEvent, failCount: 5, failAction: Behaviour::Continue);
+}
+```
+**For Stream and HTTP events**, you can specify:
+- `failCount`: Number of consecutive failures allowed before taking action
+- `failAction`: Behavior when failures are exhausted:
+  - `Behaviour::Continue` - Stop monitoring this event, keep waiting for others
+  - `Behaviour::Exit` - Stop waiting and take the default branch
+  - `Behaviour::Resolve` - Stop waiting and take this event's branch
+#### How HTTP Events Work
+HTTP events use a URL that external systems call to resume your workflow:
+1. When you register an HTTP event, the application kernel starts an HTTP handler server (external process)
+2. You set the URL that external systems can call (GET, POST, DELETE, etc.) in the event
+3. When an external system makes a request to this URL, the handler server receives it and relays it to your event gate
+4. The event gate validates the request:
+   - **If valid**: The gate stops waiting, your `__invoke()` method determines the branch, and the external system receives a response confirming the workflow will resume. The URL resource is then removed from the handler server (single-shot resource).
+   - **If invalid**: The handler server responds with HTTP 400 (or other error code) and the resource remains available for the duration of the gate's timeout.
 
-A wait timeout (`$expires` member) for the gate is always set. If no event resolves during this timeout, a default branch must be selected. Think of it as a switch default.
+This allows external systems to trigger workflow resumption asynchronously without needing to know about your PHP application's internal structure.
+#### Timeout and Winner Selection
+A wait timeout (`$expires` member, defaults to 1 second) is always set. If no event resolves during this timeout, a default branch must be selected (like a switch default).
+
+In your gate's `__invoke()` method, check `$this->winner` to determine which event resolved and return the appropriate path:
+
+```php
+public function __invoke(): string
+{
+    $this->waitForEvent(); // Start the race condition
+
+    if ($this->winner === $event1) {
+        return 'path_for_event1';
+    } elseif ($this->winner === $event2) {
+        return 'path_for_event2';
+    }
+
+    return 'default_path'; // Timeout or no event resolved
+}
+```
+#### Example
+See [WaitForFileModificationGate](https://github.com/sousarmb/flows-example-app/blob/main/App/Processes/Gates/WaitForFileModificationGate.php) for a complete implementation example.
 ### Save/Undo process state
 Sometimes things go wrong. If this happens it's possible to return the current process to a previous state and resume from there.
 
