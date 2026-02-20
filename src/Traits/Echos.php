@@ -12,8 +12,8 @@ trait Echos
     /**
      * Check if HTTP handler server is running
      * 
-     * @param string $address IP address plus port, protocol is always HTTP, defaults to configuration "http.server.address" value
-     * @throws InvalidArgumentException If providded address is not valid
+     * @param string|null $address IP address plus port. Protocol is always HTTP. Defaults to configuration "http.server.address" value
+     * @throws InvalidArgumentException If provided address is not valid
      * @return bool TRUE => server reachable, FALSE => server not reachable
      */
     public function pingHandlerServer(?string $address = null): bool
@@ -27,8 +27,30 @@ trait Echos
         curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         $response = curl_exec($ch);
+        unset($ch);
         return false === $response
             ? false // server not there
             : (bool)json_decode($response); // server there
+    }
+
+    /**
+     * Check if host is reachable (CONNECT only)
+     * 
+     * @param string $address Host address to connect to
+     * @throws InvalidArgumentException If provided address is not valid
+     * @return bool TRUE => server reachable, FALSE => server not reachable
+     */
+    public function connectWithHost(string $address): bool
+    {
+        if (false === filter_var($address, FILTER_VALIDATE_URL)) {
+            throw new InvalidArgumentException('Invalid host URL');
+        }
+
+        $ch = curl_init($address);
+        curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 1);
+        curl_setopt($ch, CURLOPT_CONNECT_ONLY, true);
+        $status = curl_exec($ch);
+        unset($ch);
+        return $status;
     }
 }
