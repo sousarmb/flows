@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Flows\Processes\Internal\CLI\Create;
 
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\Collection;
+use Collectibles\IO;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Processes\CLICommand;
 use Flows\Processes\Internal\CLI\CheckAppScaffoldExistsTask;
@@ -31,10 +32,11 @@ class GateProcess extends CLICommand
             new class implements TaskContract {
                 use ClassChecker;
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws InvalidArgumentException If invalid string for gate class name or class file exists
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     echo PHP_EOL . 'Valid class names must obey regex ' . self::VALID_CLASS_REGEX . PHP_EOL . PHP_EOL;
                     $name = $io->get('argv.name');
@@ -66,10 +68,11 @@ class GateProcess extends CLICommand
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws InvalidArgumentException If gate type is invalid
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     if ($type = $io->get('argv.type')) {
                         if (!in_array($type, ['and', 'event', 'fuse', 'offloadand', 'undostate', 'xor'])) {
@@ -96,10 +99,10 @@ class GateProcess extends CLICommand
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @return CommandOutput|Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): CommandOutput|Collection|IO|null
                 {
                     $ds = DIRECTORY_SEPARATOR;
                     $fileContents = file_get_contents($io->getScaffoldTemplatesDirectory() . "{$ds}gate.{$io->get('argv.type')}.php.template");

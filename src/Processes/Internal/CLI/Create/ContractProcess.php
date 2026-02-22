@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Flows\Processes\Internal\CLI\Create;
 
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\Collection;
+use Collectibles\IO;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Processes\CLICommand;
 use Flows\Processes\Internal\CLI\CheckAppScaffoldExistsTask;
@@ -30,17 +31,18 @@ class ContractProcess extends CLICommand
             new class implements TaskContract {
                 use ClassChecker;
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $
+                 * @throws InvalidArgumentException If invalid string for interface class name or interface class file exists
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     echo PHP_EOL . 'Valid class names must obey regex ' . self::VALID_CLASS_REGEX . PHP_EOL . PHP_EOL;
                     $name = $io->get('argv.name');
                     if ($name) {
                         if (!$this->classNameIsValid($name)) {
                             throw new InvalidArgumentException('Invalid string for interface class name');
-                        } elseif ($this->classFileExists($name, 'task', $io->getScaffoldDestinationDirectory())) {
+                        } elseif ($this->classFileExists($name, 'contract', $io->getScaffoldDestinationDirectory())) {
                             throw new InvalidArgumentException('Interface class file exists');
                         }
 
@@ -65,10 +67,11 @@ class ContractProcess extends CLICommand
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws RuntimeException If unable to write contract file
+                 * @return CommandOutput|Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): CommandOutput|Collection|IO|null
                 {
                     $ds = DIRECTORY_SEPARATOR;
                     $fileContents = file_get_contents($io->getScaffoldTemplatesDirectory() . "{$ds}contract.php.template");

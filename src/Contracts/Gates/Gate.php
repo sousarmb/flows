@@ -4,21 +4,20 @@ declare(strict_types=1);
 
 namespace Flows\Contracts\Gates;
 
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\Collection;
+use Collectibles\IO;
 use Flows\Contracts\Tasks\CleanUp as CleanUpContract;
 
 interface Gate extends CleanUpContract
 {
     /**
-     *
-     * @param IOContract|null $io
+     * @param Collection|IO|null $io
      * @return self
      */
-    public function setIO(?IOContract $io = null): self;
+    public function setIO(Collection|IO|null $io = null): self;
 
     /**
-     *
-     * @return IOContract|null
+     * @return Collection|IO|null
      */
-    public function getIO(): ?IOContract ;
+    public function getIO(): Collection|IO|null;
 }

@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Flows\Processes\Internal\CLI\Create;
 
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\Collection;
+use Collectibles\IO;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Processes\CLICommand;
 use Flows\Processes\Internal\CLI\CheckAppScaffoldExistsTask;
@@ -34,10 +35,11 @@ class ObserverProcess extends CLICommand
             new class implements TaskContract {
                 use ClassChecker;
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws InvalidArgumentException If invalid string for observer class name or observer class file exists
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     echo PHP_EOL . 'Valid class names must obey regex ' . self::VALID_CLASS_REGEX . PHP_EOL . PHP_EOL;
                     $name = $io->get('argv.name');
@@ -69,10 +71,11 @@ class ObserverProcess extends CLICommand
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws InvalidArgumentException If invalid subject type
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     if ($subjectType = $io->get('argv.subjecttype')) {
                         if (!in_array($subjectType, ['gate', 'io', 'process'])) {
@@ -100,10 +103,11 @@ class ObserverProcess extends CLICommand
             new class implements TaskContract {
                 use ClassChecker;
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $
+                 * @throws InvalidArgumentException If invalid string for subject class name or subject class file does not exist
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     $subjectName = $io->get('argv.subjectname');
                     if ($subjectName) {
@@ -135,10 +139,11 @@ class ObserverProcess extends CLICommand
             SetTimingTask::class,
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws RuntimeException If unable to write observer class file
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     $ds = DIRECTORY_SEPARATOR;
                     $fileContents = file_get_contents($io->getScaffoldTemplatesDirectory() . "{$ds}observer.php.template");
@@ -183,10 +188,11 @@ class ObserverProcess extends CLICommand
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws RuntimeException If unable to register new observer to configuration file
+                 * @return CommandOutput|Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): CommandOutput|Collection|IO|null
                 {
                     $ds = DIRECTORY_SEPARATOR;
                     $subjectObserverMapFile = $io->getScaffoldDestinationDirectory() . "Config{$ds}subject-observer.php";

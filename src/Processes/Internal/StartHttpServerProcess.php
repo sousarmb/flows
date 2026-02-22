@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Flows\Processes\Internal;
 
 use Collectibles\Collection;
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\IO;
 use Composer\InstalledVersions;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Exceptions\CouldNotStartHttpServerException;
@@ -25,10 +25,10 @@ class StartHttpServerProcess extends Process
             new class implements TaskContract {
                 use Echos;
                 /**
-                 * @param IOContract|null $io
-                 * @return IOContract|null
+                 * @param Collection|IO|null $io
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     if ($this->pingHandlerServer()) {
                         throw new HttpHandlerServerRunningException();
@@ -66,10 +66,10 @@ class StartHttpServerProcess extends Process
                 use Echos;
                 use RandomString;
                 /**
-                 * @param IOContract|null $io
-                 * @return IOContract|null
+                 * @param Collection|IO|null $io
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     $descriptorSpec = [
                         0 => ['pipe', 'r'], // STDIN (write to child process)

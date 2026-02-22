@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Flows\Processes\Internal\CLI\Create;
 
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\Collection;
+use Collectibles\IO;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Processes\CLICommand;
 use Flows\Processes\Internal\CLI\CheckForCommandFlagTask;
@@ -14,6 +15,7 @@ use InvalidArgumentException;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RuntimeException;
+use SplFileInfo;
 
 class ScaffoldProcess extends CLICommand
 {
@@ -25,10 +27,10 @@ class ScaffoldProcess extends CLICommand
             CheckForCommandFlagTask::class,
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @return CommandOutput|Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): CommandOutput|Collection|IO|null
                 {
                     if (is_dir($io->getScaffoldDestinationDirectory())) {
                         return new CommandOutput(
@@ -49,6 +51,15 @@ class ScaffoldProcess extends CLICommand
 
                 public function cleanUp(bool $forSerialization = false): void {}
 
+                /**
+                 * Recursively copy a directory and its contents to a new location
+                 * Note: This method assumes that the source directory exists and is readable, and that the destination directory is writable or can be created. It does not handle symbolic links or special file types.
+                 * 
+                 * @param string $source The path of the source directory
+                 * @param string $destination The path of the destination directory
+                 * @throws InvalidArgumentException If source is not a directory
+                 * @throws RuntimeException If unable to create a directory or copy a file
+                 */
                 private function copyDirectory(string $source, string $destination): void
                 {
                     // Normalize paths (remove trailing slashes/backslashes)

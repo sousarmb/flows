@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Flows\Processes\Internal\CLI\Create;
 
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\Collection;
+use Collectibles\IO;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Processes\CLICommand;
 use Flows\Processes\Internal\CLI\CheckAppScaffoldExistsTask;
@@ -31,10 +32,11 @@ class ProcessProcess extends CLICommand
             new class implements TaskContract {
                 use ClassChecker;
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws InvalidArgumentException If invalid string for process class name or class file exists
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     echo PHP_EOL . 'Valid class names must obey regex ' . self::VALID_CLASS_REGEX . PHP_EOL . PHP_EOL;
                     $name = $io->get('argv.name');
@@ -67,10 +69,11 @@ class ProcessProcess extends CLICommand
             new class implements TaskContract {
                 use ClassChecker;
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws InvalidArgumentException If invalid string for task class name or class file exists
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     if ($tasks = $io->get('argv.tasks')) {
                         $temp = [];
@@ -108,10 +111,11 @@ class ProcessProcess extends CLICommand
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws RuntimeException If unable to write process or task class file
+                 * @return CommandOutput|Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): CommandOutput|Collection|IO|null
                 {
                     $ds = DIRECTORY_SEPARATOR;
                     $fileContents = file_get_contents($io->getScaffoldTemplatesDirectory() . "{$ds}process.php.template");

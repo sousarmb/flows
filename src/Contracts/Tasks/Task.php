@@ -4,14 +4,15 @@ declare(strict_types=1);
 
 namespace Flows\Contracts\Tasks;
 
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\Collection;
+use Collectibles\IO;
 
 interface Task extends CleanUp
 {
     /**
      *
-     * @param IOContract|null $io
-     * @return IOContract|null
+     * @param Collection|IO|null $io 
+     * @return Collection|IO|null
      */
-    public function __invoke(?IOContract $io = null): ?IOContract;
+    public function __invoke(Collection|IO|null $io = null): Collection|IO|null;
 }

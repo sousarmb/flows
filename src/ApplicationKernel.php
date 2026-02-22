@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Flows;
 
 use Collectibles\Collection;
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\IO;
 use Flows\Container\Container;
 use Flows\Event\Kernel as EventKernel;
 use Flows\Exceptions\HttpHandlerServerRunningException;
@@ -35,7 +35,7 @@ class ApplicationKernel
     private SplStack $stack;
     private static bool $fullStop;
 
-    private function flow(): ?IOContract
+    private function flow(): Collection|IO|null
     {
         $collection = new Collection();
         $end = false;
@@ -158,13 +158,13 @@ class ApplicationKernel
      * Process the flow
      * 
      * @param string $nsInitialProcess Start with this process
-     * @param ?IOContract $io Give it this input
-     * @return IOContract|null
+     * @param Collection|IO|null $io Give it this input
+     * @return Collection|IO|null
      */
     public function process(
         string $nsInitialProcess,
-        ?IOContract $io = null
-    ): ?IOContract {
+        Collection|IO|null $io = null
+    ): Collection|IO|null {
         $this->stack->push([
             // Start flow with this process
             $this->processes->getNamed($nsInitialProcess),
