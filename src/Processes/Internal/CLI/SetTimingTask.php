@@ -2,7 +2,8 @@
 
 namespace Flows\Processes\Internal\CLI;
 
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\Collection;
+use Collectibles\IO;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Processes\Internal\IO\CLICollection;
 use InvalidArgumentException;
@@ -10,10 +11,11 @@ use InvalidArgumentException;
 class SetTimingTask implements TaskContract
 {
     /**
-     * @param IOContract|CLICollection|null $io
-     * @return IOContract|null
+     * @param CLICollection|Collection|IO|null $io
+     * @throws InvalidArgumentException If timing is invalid
+     * @return Collection|IO|null
      */
-    public function __invoke(?IOContract $io = null): ?IOContract
+    public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
     {
         if ($timing = $io->get('argv.timing')) {
             if (!in_array($timing, ['realtime', 'defer_process', 'defer_flow'])) {

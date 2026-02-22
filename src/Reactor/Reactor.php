@@ -42,7 +42,7 @@ class Reactor
             if ($now >= $time) {
                 $callback($this);
                 if ([] === $this->timers) {
-                    // stoprun() called in callback, nothing else to do
+                    // stopRun() called in callback, nothing else to do
                     return;
                 }
                 if ($repeat) {
@@ -95,5 +95,37 @@ class Reactor
     public function stopRun(): void
     {
         $this->readHandlers = $this->writeHandlers = $this->timers = [];
+    }
+
+    /**
+     * Check if a stream has a handler registered, either for reading or writing
+     * 
+     * @param resource $stream
+     * @return bool
+     */
+    public function hasHandler($stream): bool
+    {
+        return isset($this->readHandlers[(int)$stream])
+            || isset($this->writeHandlers[(int)$stream]);
+    }
+
+    /**
+     * Check if there are any handlers registered, either for reading or writing
+     * 
+     * @return bool
+     */
+    public function hasHandlers(): bool
+    {
+        return !([] === $this->readHandlers && [] === $this->writeHandlers);
+    }
+
+    /**
+     * Check if there are any timers registered
+     * 
+     * @return bool
+     */
+    public function hasTimers(): bool
+    {
+        return !([] === $this->timers);
     }
 }

@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Flows\Processes;
 
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\Collection;
+use Collectibles\IO;
 use Flows\Contracts\Gates\Gate as GateContract;
 use Flows\Contracts\Tasks\CleanUp as CleanUpContract;
 use Flows\Contracts\Tasks\Task as TaskContract;
@@ -111,11 +112,11 @@ abstract class Process implements CleanUpContract
 
     /**
      *
-     * @param IOContract|null $io
-     * @return GateContract|IOContract|null
+     * @param Collection|IO|null $io
+     * @return GateContract|Collection|IO|null
      * @throws RuntimeException
      */
-    private function handle(?IOContract $io = null): GateContract|IOContract|null
+    private function handle(Collection|IO|null $io = null): GateContract|Collection|IO|null
     {
         do {
             $task = $this->tasks[$this->position];
@@ -171,10 +172,10 @@ abstract class Process implements CleanUpContract
      * Start from first task
      *
      * @param Collection|null $io
-     * @return GateContract|IOContract|null
+     * @return GateContract|Collection|IO|null
      * @throws LogicException
      */
-    public function run(?IOContract $io = null): GateContract|IOContract|null
+    public function run(Collection|IO|null $io = null): GateContract|Collection|IO|null
     {
         if ($this->done()) {
             throw new LogicException('Process already completed');
@@ -188,11 +189,11 @@ abstract class Process implements CleanUpContract
      *
      * Resume where left
      * 
-     * @param IOContract|null $io
-     * @return GateContract|IOContract|null
+     * @param Collection|IO|null $io
+     * @return GateContract|Collection|IO|null
      * @throws LogicException
      */
-    public function resume(?IOContract $io = null): GateContract|IOContract|null
+    public function resume(Collection|IO|null $io = null): GateContract|Collection|IO|null
     {
         if ($this->done()) {
             throw new LogicException('Process already completed');
@@ -201,7 +202,7 @@ abstract class Process implements CleanUpContract
         return $this->handle($io);
     }
 
-    private function makeObservation(GateContract|IOContract|null $subject): void
+    private function makeObservation(GateContract|Collection|IO|null $subject): void
     {
         // Null-safe observation
         $subject && $this->observers?->observe($subject);

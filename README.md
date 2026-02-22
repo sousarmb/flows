@@ -162,7 +162,7 @@ namespace App\Processes;
 
 use App\Processes\IO\[io_class_A];
 use App\Processes\Tasks\[task_class_A];
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\Collection;
 use Collectibles\IO;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Gates\[gate_class_A];
@@ -178,7 +178,7 @@ class [process_class_A] extends Process
             [task_class_A]::class,
             // Or define an anonymous class that implements the Task contract
             new class implements TaskContract {
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     // Use anonymous classes as intented
                     return new readonly class(1) extends IO {
@@ -189,7 +189,7 @@ class [process_class_A] extends Process
                 public function cleanUp(bool $forSerialization = false): void {}
             },
             new class implements TaskContract {
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     return new [io_class_A]($io->get('counter') + 1);
                 }
@@ -213,7 +213,7 @@ class [process_class_A] extends Process
             // Return to the "main" branch
             // This final task use output from the previous tasks, which has been collected into one output collection, grouped by class name
             new class implements TaskContract {
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     $pid = ['parent#PID' => getmypid()];
                     $pid[[parallel_process_A]::class . '#PID'] = $io->get([parallel_process_A]::class)->get('pid');
@@ -248,13 +248,14 @@ declare(strict_types=1);
 namespace App\Processes\Tasks;
 
 use App\Processes\IO\[io_class_A];
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\Collection;
+use Collectibles\IO;
 use Flows\Contracts\Tasks\Task as TaskContract;
 
 class [task_class_A] implements TaskContract
 {
     // Input and output passing is managed by the library
-    public function __invoke(?IOContract $io = null): ?IOContract
+    public function __invoke(Collection|IO|null $io = null): Collection|IO|null
     {
         return new [io_class_A](
             getmypid(),
@@ -313,11 +314,44 @@ Observations can happen:
 
 Set this behaviour using attributes available in the `Flows\Attributes` namespace.
 ### Process offloading
-If you need to run application workflows in separate PHP processes (different #PID) use an [offload gate](https://github.com/sousarmb/flows-example-app/blob/main/App/Processes/Gates/LetsGoOffloadGate.php). The application kernel will handle new process creation and communication with the "parent" process using a reactor. 
+Use an [offload gate](https://github.com/sousarmb/flows-example-app/blob/main/App/Processes/Gates/LetsGoOffloadGate.php) to run application workflows in separate PHP processes (different #PID) when you need true parallel execution. The application kernel handles new process creation, inter-process communication, and synchronization using a reactor pattern with non-blocking I/O.
 
-The "parent" process is paused while waiting for the "child" processes to complete. The new "child" processes receive the same input (output from the last task in the "parent" process) and are not synchronized with each other. 
+#### How It Works
+The kernel spawns one or more child PHP processes via `proc_open()`, each running an isolated script. Each child process receives the same input (output from the last task in the parent process) and executes independently - they are not synchronized with each other. The parent process "pauses" while waiting for the spawned child processes to complete, communication between parent and child processes happens through pipes: child processes receive work instructions via stdin, return results via stdout, and report errors via stderr. 
 
-When the child process complete, their output is collected and the parent process is given it, to pass resume and pass it to the next task.
+A **reactor** (event-driven I/O manager) coordinates this communication by listening on multiple file descriptors simultaneously using `stream_select()`. When child processes are done, the reactor collects their output and the parent process resumes, passing the collected output to the next task.
+
+#### Error Logging
+Child processes maintain separate log files, independent of the parent process logs. Log files are automatically created in the `App/Logs` directory and named after the offloaded process (with namespace backslashes replaced by dashes, e.g., `App-Processes-MyProcess.log`).
+
+When errors, warnings, or notices occur in child processes:
+1. They are logged to the child process's dedicated log file
+2. Simultaneously, error-level messages are also sent to the parent process via *stderr* notification
+3. Both happen in parallel, so the parent process is immediately aware of child process failures
+
+#### Handling Offloaded Process Errors
+When an error occurs in a child process, the reactor triggers an `OffloadedProcessError` event. You **must** write and register an event handler for this event in your `App/Config/event-handler.php` configuration to handle the error appropriately.
+
+Additionally, the behavior when a child process fails is controlled by the configuration setting `stop.on_offload_error` in `App/Config/app.php`:
+
+**If `stop.on_offload_error` is `true` (default):**
+- The reactor immediately stops listening for other child processes
+- The application kernel is signaled to halt (`ApplicationKernel::fullStop()`)
+- An `ApplicationFullStop` event is fired - you **must** write and register an event handler for this as well
+- The workflow stops, and no further processes are executed
+
+**If `stop.on_offload_error` is `false`:**
+- The reactor continues waiting for other child processes to complete
+- The workflow does not stop; it proceeds to the next task
+- The failed child process contributes no output to the next task's input
+
+> When a child process fails, it produces no output for the next task in the workflow. A failed child process key will be missing from the collected output. When writing the next task:
+>- Always check if the child process output exists before using it
+>- Handle exceptions when retrieving failed child process output
+>- Be aware that subsequent tasks may receive incomplete input if preceding child processes failed
+>
+>Example: if `Process_A`, `Process_B`, and `Process_C` run in parallel but `Process_B` fails, the next task will only receive output from `Process_A` and `Process_C`, trying to get `Process_B` output from the output `Collection` will result in an exception being thrown.
+
 ### Process serialization (WIP)
 Process and task classes implement `__sleep()` and `__wakeup()` to allow serialization. In theory a workflow can be "frozen" in time to be stored in a database, reloaded and resumed at any later time. Work in progress.
 ### React to external events

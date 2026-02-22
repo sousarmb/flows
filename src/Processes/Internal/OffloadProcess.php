@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Flows\Processes\Internal;
 
 use Collectibles\Collection;
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\IO;
 use Flows\ApplicationKernel;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Facades\Config;
@@ -25,10 +25,10 @@ class OffloadProcess extends Process
         $this->tasks = [
             new class implements TaskContract {
                 /**
-                 * @param IOContract|null $io
-                 * @return IOContract|null
+                 * @param Collection|IO|null $io
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     // change to OffloadedProcess.php script directory
                     if (!chdir(dirname(__FILE__, 3))) {
@@ -53,10 +53,10 @@ class OffloadProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|null $io
-                 * @return IOContract|null
+                 * @param Collection|IO|null $io
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     $descriptorSpec = [
                         0 => ['pipe', 'r'], // STDIN (write to child process)
@@ -89,44 +89,43 @@ class OffloadProcess extends Process
             new class implements TaskContract {
                 use OffloadedProcess;
 
-                private array $processes;
-                private bool $default_stop_on_offload_error = true;
+                private bool $defaultStopOnOffloadError = true;
                 /**
-                 * @param IOContract|null $io
-                 * @return IOContract|null
+                 * @param Collection|IO|null $io
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
-                    $this->processes = $io->get('processes');
                     $output = new Collection();
                     $reactor = new Reactor();
                     // Wait/read process output
                     foreach ($io->get('processes') as $processName => [$process, $stdin, $stdout, $stderr]) {
-                        $reactor->onReadable($stderr, function ($stream, $reactor) use ($io, $stdout, $processName) {
+                        $reactor->onReadable($stderr, function ($stream, $reactor) use ($io, $stdout, $processName): void {
                             // Get process error data
                             $data = fgets($stream);
                             if ($data === $io->get('contentTerminator') . PHP_EOL) {
                                 // Remove pipes to prevent infinite loop
                                 $reactor->remove($stdout);
                                 $reactor->remove($stream);
-                                // Throw event, developer has to write a handler to it
+                                // Throw event (developer has to write a handler to it)
                                 Events::handle(
                                     new OffloadedProcessError($processName, $io)
                                 );
-                                if (Config::getApplicationSettings()->get('stop.on_offload_error', $this->default_stop_on_offload_error)) {
+                                if (Config::getApplicationSettings()->get('stop.on_offload_error', $this->defaultStopOnOffloadError)) {
                                     // Stop reactor 
                                     // Other offloaded processes continue running for a while!
                                     $reactor->stopRun();
                                     // Stop the kernel from running other processes
                                     ApplicationKernel::fullStop();
                                 }
-                            } elseif ($data) {
+                            } elseif (!empty($data)) {
                                 Logger::alert('Unexpected output from offloaded process', [$data]);
-                            } elseif (!$data) {
+                            }
+                            if (feof($stream)) {
                                 $reactor->remove($stream);
                             }
                         });
-                        $reactor->onWritable($stdin, function ($stream, $reactor) use ($processName, $io) {
+                        $reactor->onWritable($stdin, function ($stream, $reactor) use ($processName, $io): void {
                             // Send work to command
                             $message = sprintf(
                                 '%s|%s|%s|%s' . PHP_EOL,
@@ -141,53 +140,68 @@ class OffloadProcess extends Process
                             // Setup piped, one less stream to write to
                             $reactor->remove($stream);
                         });
-                        $reactor->onReadable($stdout, function ($stream, $reactor) use ($processName, $io, $output) {
+                        $reactor->onReadable($stdout, function ($stream, $reactor) use ($processName, $io, $output): void {
                             // Get process data
                             $data = fgets($stream);
                             if ($data === $io->get('contentTerminator') . PHP_EOL) {
-                                // return stored, one less stream to listen to
+                                // Return stored, one less stream to listen to
                                 $reactor->remove($stream);
-                            } elseif ($data !== false) {
-                                // store process output in the "processIO" collection
-                                $output->set(unserialize(base64_decode($data)), $processName);
+                            } elseif (!empty($data)) {
+                                /* Store process output in the "processIO" collection. The main process will be 
+                                 * listening to it and will know which process it belongs to by the key.
+                                 * Using unserialize() because child process output is an instance of Collection 
+                                 * or IO. This way we get the class back just as it was returned by the child 
+                                 * process. base64_encode() is used to prevent any issues with special characters 
+                                 * in the output. */
+                                $return = unserialize(
+                                    base64_decode($data),
+                                    ['allowed_classes' => [Collection::class, IO::class]]
+                                );
+                                if (!($return instanceof Collection
+                                    || $return instanceof IO)) {
+                                    throw new RuntimeException('Unexpected object type: ' . get_class($return));
+                                }
+
+                                $output->set($return, $processName);
+                            }
+                            if (feof($stream)) {
+                                $reactor->remove($stream);
                             }
                         });
-                        // When all processes done, loop terminates itself
-                        // check max_execution_time to force process termination
-                        $maxExecutionTime = (int) ini_get('max_execution_time');
-                        if ($maxExecutionTime > 0) {
-                            // 1 ms before script timeout check if process running
-                            $reactor->addTimer(
-                                $maxExecutionTime - 0.001,
-                                function ($reactor) use ($processName, $process, $stdin, $stdout) {
-                                    if (proc_get_status($process)['running']) {
-                                        // do not listen anymore
-                                        $message = sprintf(
-                                            'Offloaded process - #%s %s - about to exceeded script execution time, ignoring STDIN, STDOUT',
-                                            (int)$process,
-                                            $processName
-                                        );
-                                        trigger_error($message, E_USER_WARNING);
-                                        $reactor->remove($stdin);
-                                        $reactor->remove($stdout);
-                                    }
-                                },
-                                false
-                            );
-                        }
                     }
+                    $frequency = Config::getApplicationSettings()->get('offloaded_process_status_check_frequency', 0.01  /* 10ms */);
+                    /* Check if process(es) is still running, if not, remove all pipes to prevent infinite 
+                     * loop. This is a safety net in case something unexpected happens and we miss the 
+                     * content terminator, or it never comes for some reason. */
+                    $reactor->addTimer($frequency, function ($reactor) use ($io): void {
+                        foreach ($io->get('processes') as [$process, $stdin, $stdout, $stderr]) {
+                            if (!proc_get_status($process)['running']) {
+                                if (
+                                    $reactor->hasHandler($stderr)
+                                    && feof($stderr)
+                                ) {
+                                    // Offloaded process over, all data read
+                                    $reactor->remove($stderr);
+                                }
+                                if (
+                                    $reactor->hasHandler($stdout)
+                                    && feof($stdout)
+                                ) {
+                                    // Offloaded process over, all data read
+                                    $reactor->remove($stdout);
+                                }
+                                // $stdin was removed already
+                            }
+                        }
+                        if (!$reactor->hasHandlers()) {
+                            $reactor->stopRun();
+                        }
+                    }, true);
                     $reactor->run();
                     return $output;
                 }
 
-                public function cleanUp(bool $forSerialization = false): void
-                {
-                    foreach ($this->processes as $nsProcess => [$process, $stdin, $stdout, $stderr]) {
-                        // Always signal to terminate and close process resources 
-                        $this->terminateProcess($process);
-                        $this->closeProcess($process);
-                    }
-                }
+                public function cleanUp(bool $forSerialization = false): void {}
             },
         ];
 

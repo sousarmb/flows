@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Flows\Processes\Internal\CLI\Create;
 
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\Collection;
+use Collectibles\IO;
 use Flows\Contracts\Tasks\Task as TaskContract;
 use Flows\Processes\CLICommand;
 use Flows\Processes\Internal\CLI\CheckAppScaffoldExistsTask;
@@ -35,10 +36,11 @@ class ServiceProcess extends CLICommand
             new class implements TaskContract {
                 use ClassChecker;
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws InvalidArgumentException If invalid service name or service class file exists or service provider class file exists
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     echo PHP_EOL . 'Valid class names must obey regex ' . self::VALID_CLASS_REGEX . PHP_EOL . PHP_EOL;
                     $name = $io->get('argv.name');
@@ -74,10 +76,11 @@ class ServiceProcess extends CLICommand
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws InvalidArgumentException If invalid lazy string
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     $lazy = $io->get('argv.lazy');
                     if ($lazy) {
@@ -104,10 +107,11 @@ class ServiceProcess extends CLICommand
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws InvalidArgumentException If invalid singleton string
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     $singleton = $io->get('argv.singleton');
                     if ($singleton) {
@@ -134,10 +138,11 @@ class ServiceProcess extends CLICommand
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws InvalidArgumentException If invalid implementation type
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     if ($implementation = $io->get('argv.implementation')) {
                         if (!in_array($implementation, ['abstract', 'concrete'])) {
@@ -165,10 +170,12 @@ class ServiceProcess extends CLICommand
             new class implements TaskContract {
                 use ClassChecker;
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws InvalidArgumentException If invalid string for contract class name or contract class file exists
+                 * @throws LogicException If concrete implementation is selected but contract is provided
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     if ('concrete' === $io->get('argv.implementation')) {
                         if ($io->get('argv.contract')) {
@@ -207,10 +214,11 @@ class ServiceProcess extends CLICommand
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws RuntimeException If unable to write service class file
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     $ds = DIRECTORY_SEPARATOR;
                     $fileContents = file_get_contents($io->getScaffoldTemplatesDirectory() . "{$ds}service.{$io->get('argv.implementation')}.php.template");
@@ -255,10 +263,11 @@ class ServiceProcess extends CLICommand
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws RuntimeException If unable to write service provider file
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     if ('concrete' === $io->get('argv.implementation')) {
                         return $io;
@@ -297,10 +306,11 @@ class ServiceProcess extends CLICommand
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws RuntimeException If unable to write contract file
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): Collection|IO|null
                 {
                     if ('concrete' === $io->get('argv.implementation')) {
                         return $io;
@@ -329,10 +339,11 @@ class ServiceProcess extends CLICommand
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|CLICollection|null $io
-                 * @return IOContract|null
+                 * @param CLICollection|Collection|IO|null $io
+                 * @throws RuntimeException If unable to register new service to configuration file
+                 * @return CommandOutput|Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(CLICollection|Collection|IO|null $io = null): CommandOutput|Collection|IO|null
                 {
                     $ds = DIRECTORY_SEPARATOR;
                     $serviceProviderMapFile = $io->getScaffoldDestinationDirectory() . "Config{$ds}service-provider.php";

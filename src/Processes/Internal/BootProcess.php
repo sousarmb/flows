@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Flows\Processes\Internal;
 
 use Collectibles\Collection;
-use Collectibles\Contracts\IO as IOContract;
+use Collectibles\IO;
 use Composer\InstalledVersions;
 use Exception;
 use Flows\ApplicationKernel;
@@ -48,10 +48,10 @@ class BootProcess extends Process
             new class implements TaskContract {
                 use RandomString;
                 /**
-                 * @param IOContract|null $io
-                 * @return IOContract|null
+                 * @param Collection|IO|null $io
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     define('FLOWS_PACKAGE_NAME', 'rsousa/flows');
                     define('STARTER_DIRECTORY', getcwd());
@@ -67,10 +67,10 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|null $io
-                 * @return IOContract|null
+                 * @param Collection|IO|null $io
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     $ds = DIRECTORY_SEPARATOR;
                     // Where is the code?
@@ -101,10 +101,10 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|null $io
-                 * @return IOContract|null
+                 * @param Collection|IO|null $io
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     $config = $io->get(Config::class);
                     $logger = new Logger('debug');
@@ -130,10 +130,10 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|null $io
-                 * @return IOContract|null
+                 * @param Collection|IO|null $io
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     $config = $io->get(Config::class);
                     if (!chdir($config->get('app.config.directory'))) {
@@ -160,10 +160,10 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|null $io
-                 * @return IOContract|null
+                 * @param Collection|IO|null $io
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     $config = $io->get(Config::class);
                     $file = $config->get('app.config.files.0'); // app.php
@@ -188,10 +188,10 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|null $io
-                 * @return IOContract|null
+                 * @param Collection|IO|null $io
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     $config = $io->get(Config::class);
                     $file = $config->get('app.config.files.1'); // service-provider.php
@@ -259,10 +259,10 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|null $io
-                 * @return IOContract|null
+                 * @param Collection|IO|null $io
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     $config = $io->get(Config::class);
                     $file = $config->get('app.config.files.2'); // event-handler.php
@@ -310,10 +310,10 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|null $io
-                 * @return IOContract|null
+                 * @param Collection|IO|null $io
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     $config = $io->get(Config::class);
                     $file = $config->get('app.config.files.3'); // subject-observer.php
@@ -361,10 +361,10 @@ class BootProcess extends Process
             },
             new class implements TaskContract {
                 /**
-                 * @param IOContract|null $io
-                 * @return IOContract|null
+                 * @param Collection|IO|null $io
+                 * @return Collection|IO|null
                  */
-                public function __invoke(?IOContract $io = null): ?IOContract
+                public function __invoke(Collection|IO|null $io = null): Collection|IO|null
                 {
                     $container = $io->get(Container::class);
                     EventFacade::setContainer($container);
